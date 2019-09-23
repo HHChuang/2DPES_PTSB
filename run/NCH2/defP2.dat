@@ -1,0 +1,9 @@
+# Distance criteria (criteria: 3 digit) # do not remove this line
+3
+16 20 2.0 gt and 
+2 20 2.0 lt and
+3 20 2.0 lt end
+# Angle criteria (input: degree) # do not remove this line
+0
+# Dihedral angle criteria # do not remove this line
+0
