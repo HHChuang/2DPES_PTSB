@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-#################################################################
-# Program:                                                      #
-#   Rotate trajectory in order to fit the orientation of        #
-#   this 2D-PES                                                 #
-#                                                               #
-# Input:                                                        #
-#       $1 = ts.Traj; transition-state structures of trajectory #
-#       $2 = ts.PES; transition-state structures of 2D-PES      #
-#       $3 = Traj; structures of single trajectory              #
-#                                                               #
-# Output:                                                       #
-#       rot.$3                                                  #
-#                                                               #
-# History:                                                      #
-# 2018/12/21, Grace                                             #
-# 2019/06/04, Grace, modify the structure of this code, and     #
-# reserve the comment line from the original trajectories.      #
-#################################################################
+#########################################################################################
+# Program:                                                                              #
+#   Rotate trajectory in order to fit the orientation of                                #
+#   this 2D-PES                                                                         #
+#                                                                                       #
+# Input:                                                                                #
+#       $1 = ts.Traj; transition-state structures of trajectory                         #
+#       $2 = ts.PES; transition-state structures of 2D-PES                              #
+#       $3 = Traj; structures of single trajectory                                      #
+#                                                                                       #
+# Output:                                                                               #
+#       rot.$3                                                                          #
+#                                                                                       #
+# History:                                                                              #
+# 2018/12/21, Grace                                                                     #
+# 2019/06/04, Grace, modify the structure of this code, and reserve the comment line    #
+#   from the original trajectories.                                                     #
+# 2019/09/24, Grace, translation part is wrong in rotM_D().                             #
+# reference: https://github.com/leeping/forcebalance/blob/master/src/molecule.py#L692   #
+#########################################################################################
 
 import numpy as np
 import re
@@ -26,7 +28,7 @@ import sys
 def main():
     # 1. optimize rotation matrix via Kabsch algorithm
     # by minimize the RMSD between two similar structures
-    R, D = rotM_D()
+    R, D = rotM_T()
 
     # 2. use above rotation matrix to rotate all the
     # structures in one dynamic trajectory
@@ -102,25 +104,30 @@ def kabsch(coord_var, coord_ref):
     return R
 
 
-def rotM_D():
+def rotM_T():
     # Input 2 molecular structure; argv1 (var) and argv2 (ref)
     coord_var_atoms, coord_var = get_coord(str(sys.argv[1]))
     coord_ref_atoms, coord_ref = get_coord(str(sys.argv[2]))
     rmsd1 = rmsd(coord_var, coord_ref)
+
     # Centroid
     coord_var_cen = coord_var - centroid(coord_var)
     coord_ref_cen = coord_ref - centroid(coord_ref)
-    # Distance between two centroids
-    D = centroid(coord_var) - centroid(coord_ref)
 
+    # Calculate rotation matrix via Kabsch method (covariance matrix)
     R = kabsch(coord_var_cen, coord_ref_cen)
-    coord_var_cen = np.dot(coord_var_cen, R)
-    rmsd2 = rmsd(coord_var_cen, coord_ref_cen)
+
+    # Translation matrix
+    T = coord_ref_cen - np.dot(coord_var_cen, R)
+
+    # Move var. coord
+    coord_var = np.dot(coord_var, R) + T
+
+    rmsd2 = rmsd(coord_var, coord_ref)
     print("% 7.4f % 7.4f" % (rmsd1, rmsd2))
-    # print(R)
     # frag = str(sys.argv[1]).split('.')
     # np.savetxt('.'.join(['rotM', frag[3]]), R, fmt='%10.6f')
-    return R, D
+    return R, T
 
 
 def get_traj(allTraj, n1, n2):
@@ -149,7 +156,7 @@ def totline(filename):
     return i + 1
 
 
-def rot_tran_Traj(R, D):
+def rot_tran_Traj(R, T):
     # Set up variables, njobs
     tline = totline(str(sys.argv[3]))
     f = open(str(sys.argv[3]), 'r')
@@ -169,11 +176,8 @@ def rot_tran_Traj(R, D):
         n2 = (i + 1) * (NAtoms + 2) - 1
         comment, atom, coord = get_traj(allTraj, n1, n2)
 
-        # translation
-        coord = coord - D
-
-        # rotation
-        coord = np.dot(coord, R)
+        # rotaiton and translation
+        coord = np.dot(coord, R) + T
 
         # export the rotated trajectory
         traj.write(str(NAtoms) + '\n')

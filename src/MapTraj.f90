@@ -51,7 +51,12 @@
 ! 2019/09/10, Grace, debug of the subroutine findFirstPt(), add loop    !
 !   back which is removed before because of considering the heavy cost. !
 !   Modify get_zero_dRMSD(); in a local minimum region, use uneven      !
-!   length to search local minimum. 
+!   length to search local minimum.                                     !
+! 2019/09/26, Grace, expand step2_select1fromNeighbors() form the first !
+!   shell to the third shell. It converges at the H3CO system (i.e.     !
+!   check the subpages of H3CO at the excel; Summary.xls). For tune     !
+!   trajectories, locate a unimodal in 2D surface first, and then       !
+!   implement 2D golden section search in tuneTraj().                   !
 !                                                                       !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -287,201 +292,363 @@ Module extractData
     
         num1D = INT(SQRT(numPts*1.0D0))
     
-        neighbors = 0
-        neighbors(1) = index + num1D        ! right
-        neighbors(2) = index - num1D        ! left
-        neighbors(3) = index + 1            ! upper
-        neighbors(4) = index - 1            ! lower
-        if ( numNeighbor .eq. 8 ) then 
-            neighbors(5) = index + num1D + 1    ! upper right corner
-            neighbors(6) = index + num1D - 1    ! lower right corner
-            neighbors(7) = index - num1D + 1    ! upper left corner
-            neighbors(8) = index - num1D - 1    ! lower left corner
+        ! Step 1. Assign neighbors, which has four classes. 
+        ! 1. 4 neighbors; right, left, upper and lower elements
+        ! 2. 8 neighbors; the first shell of the center index
+        ! 3. 24 neighbors; the second shell
+        ! 4. 48 neighbors; the third shell
+        if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+            .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+            neighbors = 0
+            neighbors(1) = index + num1D        ! right
+            neighbors(2) = index - num1D        ! left
+            neighbors(3) = index + 1            ! upper
+            neighbors(4) = index - 1            ! lower
+            ! the closest neighbors; the first shell
+            if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) &
+                .or. ( numNeighbor .eq. 48 ) ) then 
+                neighbors(5) = index + num1D + 1    ! upper right corner
+                neighbors(6) = index + num1D - 1    ! lower right corner
+                neighbors(7) = index - num1D + 1    ! upper left corner
+                neighbors(8) = index - num1D - 1    ! lower left corner
+            end if 
+            ! the second shell 
+            if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                do i = -2, 2 
+                    neighbors(11 + i) = index + 2 * num1D + i 
+                    neighbors(22 + i) = index - 2 * num1D + i 
+                end do
+                neighbors(14) = neighbors(5) + 1 
+                neighbors(15) = neighbors(6) - 1 
+                neighbors(16) = neighbors(3) + 1
+                neighbors(17) = neighbors(4) - 1
+                neighbors(18) = neighbors(7) + 1
+                neighbors(19) = neighbors(8) - 1 
+            end if
+            if ( numNeighbor .eq. 48 ) then 
+                do i = -3, 3
+                    neighbors(28 + i ) = index + 3 * num1D + i 
+                    neighbors(45 + i ) = index + 3 * num1D + i 
+                end do 
+                neighbors(32) = neighbors(9) + 1 
+                neighbors(33) = neighbors(13) - 1 
+                neighbors(34) = neighbors(14) + 1
+                neighbors(35) = neighbors(15) - 1
+                neighbors(36) = neighbors(16) + 1
+                neighbors(37) = neighbors(17) - 1 
+                neighbors(38) = neighbors(18) + 1 
+                neighbors(39) = neighbors(19) - 1 
+                neighbors(40) = neighbors(20) + 1
+                neighbors(41) = neighbors(21) - 1
+            end if
         end if 
     
-        ! index must stay in this surface; i.e. within the range from 1 to numPts
+        ! Step 2. Indeices must stay in this surface; i.e. within the range from 1 to numPts
+            do i = 1, numNeighbor
+                if ( neighbors(i) .gt. numPts) then 
+                    neighbors(i) = 0 
+                end if 
+            end do 
+
+        ! Step 3. Consider edge and corner conditions of the center index
         if ( ( index .lt. 1 ) .or. ( index .gt. numPts ) ) then 
             neighbors = 0
         else ! edges and corners conditions 
-            ! left edge 
+            
+            ! Left edge
             if ( ( index .ge. 1 ) .and. ( index .le. num1D  ) ) then 
-                select case (numNeighbor)
-                    case (4)
+                ! left edge 
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
                         neighbors(2) = 0
-                    case (8)
-                        neighbors(2) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
                         neighbors(7) = 0
                         neighbors(8) = 0
-                end select 
-           
-                ! index has only 2 neighbors - upper and lower left corners
-                    if ( index .eq. 1 ) then 
-                        ! lower left corner  
-                        select case (numNeighbor)
-                            case (4)
-                                neighbors(4) = 0
-                            case (8)
-                                neighbors(4) = 0
-                                neighbors(6) = 0
-                        end select 
-    
-                    else if ( index .eq. num1D ) then 
-                        ! upper left corner 
-                        select case (numNeighbor)
-                        case (4)
-                            neighbors(3) = 0
-                        case (8)
-                            neighbors(3) = 0
-                            neighbors(5) = 0
-                        end select 
                     end if
-    
-            ! right edge 
-            else if ( ( index .ge. 1 + (num1D - 1) * num1D) .and. ( index .le. numPts) ) then 
-                select case (numNeighbor)
-                case (4)
-                    neighbors(1) = 0
-                case (8)
-                    neighbors(1) = 0
-                    neighbors(5) = 0
-                    neighbors(6) = 0
-                end select 
-    
-                ! index has only 2 neighbors - upper and lower right corners
-                    if ( index .eq. 1 + (num1D - 1) * num1D ) then 
-                        ! lower right corner
-                        select case (numNeighbor)
-                        case (4)
-                            neighbors(4) = 0
-                        case (8)
-                            neighbors(4) = 0
-                            neighbors(8) = 0
-                        end select 
-    
-                    else if ( index .eq. numPts ) then 
-                        ! upper right corner 
-                        select case (numNeighbor)
-                        case (4)
-                            neighbors(3) = 0
-                        case (8)
-                            neighbors(3) = 0
-                            neighbors(7) = 0
-                        end select
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(18) = 0
+                        neighbors(19) = 0
+                        do i = 20, 24
+                            neighbors(i) = 0
+                        end do
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        do i = 38, 48 
+                            neighbors(i) = 0 
+                        end do
+                    end if
+           
+                ! upper and lower left corners
+                if ( index .eq. 1 ) then 
+                ! lower left corner  
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(4) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(6) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(12) = 0
+                        neighbors(13) = 0
+                        neighbors(15) = 0
+                        neighbors(17) = 0
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        neighbors(29) = 0
+                        neighbors(30) = 0
+                        neighbors(31) = 0
+                        neighbors(33) = 0
+                        neighbors(35) = 0
+                        neighbors(37) = 0
+                    end if
+                else if ( index .eq. num1D ) then 
+                ! upper left corner 
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(3) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(5) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(9) = 0
+                        neighbors(10) = 0
+                        neighbors(14) = 0
+                        neighbors(16) = 0
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        neighbors(25) = 0
+                        neighbors(26) = 0
+                        neighbors(27) = 0
+                        neighbors(32) = 0
+                        neighbors(34) = 0
+                        neighbors(36) = 0
                     end if 
+                end if
+    
+            ! Right edge
+            else if ( ( index .ge. 1 + (num1D - 1) * num1D) .and. ( index .le. numPts) ) then 
+                ! right edge 
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(1) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(5) = 0
+                        neighbors(6) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        do i = 9, 15
+                            neighbors(i) = 0
+                        end do
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        do i = 25, 35
+                            neighbors(i) = 0
+                        end do
+                    end if
+
+                ! upper and lower right corners
+                if ( index .eq. 1 + (num1D - 1) * num1D ) then 
+                ! lower right corner 
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(4) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(8) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(17) = 0
+                        neighbors(19) = 0
+                        neighbors(23) = 0
+                        neighbors(24) = 0
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        neighbors(37) = 0
+                        neighbors(39) = 0
+                        neighbors(41) = 0
+                        neighbors(46) = 0
+                        neighbors(47) = 0
+                        neighbors(48) = 0
+                    end if
+                else if ( index .eq. numPts ) then 
+                ! upper right corner 
+                    if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                        .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(3) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                        .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(7) = 0
+                    end if
+                    if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                        neighbors(16) = 0
+                        neighbors(18) = 0
+                        neighbors(20) = 0
+                        neighbors(21) = 0
+                    end if
+                    if ( numNeighbor .eq. 48 ) then 
+                        neighbors(36) = 0
+                        neighbors(38) = 0
+                        neighbors(40) = 0
+                        neighbors(42) = 0
+                        neighbors(43) = 0
+                        neighbors(44) = 0
+                    end if
+                end if 
             end if 
     
             ! upper edge with double count the upper left/right corner 
             if ( ( MODULO(index,num1D) .eq. 0 ) ) then !& 
-                !.and. ( index/num1D .ne. 0 ) .and. ( index/num1D .ne. ( num1D - 1 ) ) ) then 
-                select case (numNeighbor)
-                case (4)
+                if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                    .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
                     neighbors(3) = 0
-                case (8)
-                    neighbors(3) = 0
+                end if
+                if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                    .or. ( numNeighbor .eq. 48 ) ) then 
                     neighbors(5) = 0
-                    neighbors(7)  = 0 
-                end select  
+                    neighbors(7) = 0
+                end if
+                if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                    neighbors(9) = 0
+                    neighbors(10) = 0
+                    neighbors(14) = 0 
+                    neighbors(16) = 0
+                    neighbors(18) = 0
+                    neighbors(20) = 0 
+                    neighbors(21) = 0 
+                end if
+                if ( numNeighbor .eq. 48 ) then 
+                    do i = 25, 27
+                        neighbors(i) = 0
+                    end do
+                    neighbors(32) = 0
+                    neighbors(34) = 0 
+                    neighbors(36) = 0
+                    neighbors(38) = 0
+                    neighbors(40) = 0 
+                    do i = 42, 44
+                        neighbors(i) = 0
+                    end do
+                end if
                 
             ! lower edge with double count the upper left/right corner 
             else if ( ( MODULO(index,num1D) .eq. 1 ) ) then !&
-                !.and. ( index/num1D .ne. 1 ) .and. ( index/num1D .ne. num1D ) ) then 
-                select case (numNeighbor)
-                case (4)
+                if ( ( numNeighbor .eq. 4 ) .or. ( numNeighbor .eq. 8 ) & 
+                    .or. ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
                     neighbors(4) = 0
-                case (8)
-                    neighbors(4) = 0
+                end if
+                if ( ( numNeighbor .eq. 8 ) .or. ( numNeighbor .eq. 24 ) & 
+                    .or. ( numNeighbor .eq. 48 ) ) then 
                     neighbors(6) = 0
-                    neighbors(8)  = 0 
-                end select 
+                    neighbors(8) = 0
+                end if
+                if ( ( numNeighbor .eq. 24 ) .or. ( numNeighbor .eq. 48 ) ) then 
+                    neighbors(12) = 0
+                    neighbors(13) = 0
+                    neighbors(15) = 0 
+                    neighbors(17) = 0
+                    neighbors(19) = 0
+                    neighbors(23) = 0 
+                    neighbors(24) = 0 
+                end if
+                if ( numNeighbor .eq. 48 ) then 
+                    do i = 29, 31
+                        neighbors(i) = 0
+                    end do
+                    neighbors(33) = 0
+                    neighbors(35) = 0 
+                    neighbors(37) = 0
+                    neighbors(39) = 0
+                    neighbors(41) = 0 
+                    do i = 46, 48
+                        neighbors(i) = 0
+                    end do
+                end if
             end if 
-    
         end if 
     
         ! set up constraint for reverse or forward direction 
-        if ( numNeighbor .eq. 8 ) then 
-            select case (cstr)
-                case ('defR.dat')
-                    neighbors(1) = 0
-                    ! neighbors(3) = 0
-                    ! neighbors(4) = 0
-                    neighbors(5) = 0
-                    neighbors(6) = 0
-                case default 
-                    ! neighbors(2) = 0
-                    ! neighbors(7) = 0
-                    ! neighbors(8) = 0
-            end select
-        end if
+        ! if ( numNeighbor .eq. 8 ) then 
+        !     select case (cstr)
+        !         case ('defR.dat')
+        !             neighbors(1) = 0
+        !             neighbors(3) = 0
+        !             neighbors(4) = 0
+        !             neighbors(5) = 0
+        !             neighbors(6) = 0
+        !         case default 
+        !             ! neighbors(2) = 0
+        !             ! neighbors(7) = 0
+        !             ! neighbors(8) = 0
+        !     end select
+        ! end if
         return 
     end subroutine vaildNeighbors
 
-    subroutine filter2TwoNeighbors(NAtoms,numPts,PESList,coordTraj,center,indexX,indexY)
+    subroutine filter2NearestNeighbors(NAtoms,numPts,PESList,strucTraj,center,indexHor,indexVer)
         implicit none 
         integer(4),intent(in)   :: NAtoms, numPts, center
         real(8),dimension(numPts,3),intent(in) :: PESList
-        real(8),dimension(NAtoms,3),intent(in) :: coordTraj   
-        integer(4),intent(out)  :: indexX, indexY
+        real(8),dimension(NAtoms,3),intent(in) :: strucTraj   
+        integer(4),intent(out)  :: indexHor, indexVer
         ! local variable 
         integer(4)  :: i
         character(len=100)  :: buff 
         integer(4),parameter    :: numNeighbor = 4
         integer(4),dimension(numNeighbor) :: neighbors
-        real(8),dimension(numNeighbor,NAtoms,3)   :: coordNeighbors
-        real(8),dimension(NAtoms,3) :: matrixTmp1, matrixTmp2
+        real(8),dimension(numNeighbor,NAtoms,3)   :: strucNeighbors
+        real(8),dimension(NAtoms,3) :: strucTmp1, strucTmp2
     
         ! 1. Extract the 4 indeice around the input index (i.e. variable: center), 
         !   and also remove the invalide situations, i.e. edge and corner of 2D-PES. 
             call vaildNeighbors(center,numPts,buff,numNeighbor,neighbors)
-    
+
         ! 2. Extract the corresponding structures of the 4 neighbors. After that, 
         !   select only 2 vaild neighbors by comparing the structure difference 
         !    between the coordinate of trajectory and (upper,below) or (left,right).
-            coordNeighbors = 0.0D0 
+            strucNeighbors = 0.0D0 
             do i = 1, 4
                 if ( neighbors(i) .eq. 0 ) cycle 
-                call pickPESstruc(neighbors(i),NAtoms,matrixTmp1)
+                call pickPESstruc(neighbors(i),NAtoms,strucTmp1)
                 !2019/07/27, Grace, cannot pass 3D array, such that create a tmp 2D array 
-                coordNeighbors(i,:,:) = matrixTmp1 
+                strucNeighbors(i,:,:) = strucTmp1 
             end do
     
             ! Compare right and left entry, and then select one of them 
-            indexX = 0
-            ! 2019/09/03, Grace, boundary should not be zero
-            ! write(*,*) neighbors(1), neighbors(2)
-            ! if ( ( neighbors(1) .ne. 0 ) .and. (neighbors(2) .ne. 0 ) ) then  
-                matrixTmp1 = coordNeighbors(1,:,:)
-                matrixTmp2 = coordNeighbors(2,:,:)
-                call TwoNeighbors(NAtoms,coordTraj,neighbors(1),neighbors(2),matrixTmp1,matrixTmp2)
+                indexHor = 0
+                ! 2019/09/03, Grace, boundary should not be zero
+                ! write(*,*) neighbors(1), neighbors(2)
+                ! if ( ( neighbors(1) .ne. 0 ) .and. (neighbors(2) .ne. 0 ) ) then  
+                strucTmp1 = strucNeighbors(1,:,:)
+                strucTmp2 = strucNeighbors(2,:,:)
+                call TwoNeighbors(NAtoms,strucTraj,neighbors(1),neighbors(2),strucTmp1,strucTmp2)
                 if ( neighbors(1) .eq. 0 ) then 
-                    indexX = neighbors(2)
+                    indexHor = neighbors(2)
                 else 
-                    indexX = neighbors(1)
+                    indexHor = neighbors(1)
                 end if
-                
-                ! if ( indexX .eq. 0 ) then 
-                !     indexX = center
-                ! end if
-            ! end if 
     
             ! Compare upper and lower entry, and then select one of them 
-            indexY = 0
-            ! if ( ( neighbors(3) .ne. 0 ) .and. (neighbors(4) .ne. 0 ) ) then  
-                matrixTmp1 = coordNeighbors(3,:,:)
-                matrixTmp2 = coordNeighbors(4,:,:)
-                call TwoNeighbors(NAtoms,coordTraj,neighbors(3),neighbors(4),matrixTmp1,matrixTmp2)
+                indexVer = 0
+                strucTmp1 = strucNeighbors(3,:,:)
+                strucTmp2 = strucNeighbors(4,:,:)
+                call TwoNeighbors(NAtoms,strucTraj,neighbors(3),neighbors(4),strucTmp1,strucTmp2)
                 if ( neighbors(3) .eq. 0 ) then 
-                    indexY = neighbors(4)
+                    indexVer = neighbors(4)
                 else 
-                    indexY = neighbors(3)
+                    indexVer = neighbors(3)
                 end if
-                ! 2019/09/03, Grace, boundary should not be zero
-            !     if ( indexY .eq. 0 ) then 
-            !         indexY = center
-            !     end if
-            ! end if  
-            ! write(*,*) indexX, indexY 
         return 
-    end subroutine filter2TwoNeighbors
+    end subroutine filter2NearestNeighbors
 
     subroutine TwoNeighbors(NAtoms,coordTraj,index1,index2,coord1,coord2)
         implicit none
@@ -514,17 +681,17 @@ Module extractData
         return 
     end subroutine TwoNeighbors
 
-    subroutine get_length(center,indexX,indexY,XorY,moveL,length)
+    subroutine get_length(indexCen,indexHor,indexVer,XorY,moveL,length)
         implicit none
-        integer(4),intent(in)   :: center, indexX, indexY , XorY
+        integer(4),intent(in)   :: indexCen, indexHor, indexVer , XorY
         real(8),intent(in)  :: moveL 
         real(8),intent(inout)   :: length 
         ! Move the new point toward forward/backward direction.
         ! The step size of one step is $moveL. 
 
-        if ( XorY .eq. 1 ) then 
+        if ( XorY .eq. 0 ) then 
             ! x coordinate 
-            if ( center .lt. indexX ) then 
+            if ( indexCen .lt. indexHor ) then 
                 ! initial point locates at the left side of the final point.
                 ! such that move to the positive direction.
                 length = length + moveL
@@ -535,7 +702,7 @@ Module extractData
             end if
         else
             ! y coordinate 
-            if ( center .lt. indexY ) then 
+            if ( indexCen .lt. indexVer ) then 
                 ! initial point locates at the left side of the final point.
                 ! such that move to the positive direction.
                 length = length + moveL
@@ -567,127 +734,317 @@ Module extractData
         return
     end subroutine 
 
-    subroutine get_shift(NAtoms,numPts,PESList,coordTraj,center,indexX,indexY,interval,vecX,vecY)
+    subroutine get_iniNeighbor(NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,indexVer,intervalHor,intervalVer,vecHor,vecVer)
         implicit none 
-        integer(4),intent(in)   :: NAtoms, numPts, center
+        integer(4),intent(in)   :: NAtoms, numPts, indexCen
         real(8),dimension(numPts,3),intent(in) :: PESList
-        real(8),dimension(NAtoms,3),intent(in) :: coordTraj   
-        real(8),dimension(2),intent(out)    :: interval
-        integer(4),intent(out)  :: indexX, indexY
-        real(8),dimension(NAtoms,3),intent(out) :: vecX, vecY
+        real(8),dimension(NAtoms,3),intent(in) :: strucTraj   
+        real(8),intent(out)    :: intervalHor, intervalVer
+        integer(4), intent(out)  :: indexHor, indexVer
+        real(8),dimension(NAtoms,3),intent(out) :: vecHor, vecVer
         ! local variable
         integer(4)  :: i,j
-        real(8),dimension(2)    :: x0y0, horizontal, vertical
-        real(8),dimension(NAtoms,3) :: coordCenter, coordHor, coordVer
+        real(8),dimension(2)    :: coordCen, coordHor, coordVer
+        real(8),dimension(NAtoms,3) :: strucCen, strucHor, strucVer
     
     
         ! 1. Extract x0 and y0
-        !   x0 = x0y0(1) and y0 = x0y0(2). 
-        !   And then extract the the corresponding structure; i.e. coordCenter(NAtoms, 3)
+        !   extract the the corresponding structure; i.e. strucCenter(NAtoms, 3)
             do i = 1, 2
-                x0y0(i) = PESList(center,i)
+                coordCen = PESList(indexCen,i)
             end do  
-            call pickPESstruc(center,NAtoms,coordCenter)
+            call pickPESstruc(indexCen,NAtoms,strucCen)
     
         ! 2. Select its valid neighbors; get indexX and indexY. 
         !   Select one horizontal and one vertical neighbors with smaller RMSD from 
         !   four nearest neighbor; right, left, upper and lower neighbors. 
-            call filter2TwoNeighbors(NAtoms,numPts,PESList,coordTraj,center,indexX,indexY)
+            call filter2NearestNeighbors(NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,indexVer)
+
             do i = 1, 2 
-                horizontal(i) = PESList(indexX,i)
-                vertical(i) = PESList(indexY,i)
+                coordHor(i) = PESList(indexHor,i)
+                coordVer(i) = PESList(indexVer,i)
             end do
-            call pickPESstruc(indexX,NAtoms,coordHor)
-            call pickPESstruc(indexY,NAtoms,coordVer)
+            call pickPESstruc(indexHor,NAtoms,strucHor)
+            call pickPESstruc(indexVer,NAtoms,strucVer)
     
-            interval = 0.0D0 
-            interval(1) = horizontal(1) - x0y0(1)
-            interval(2) = vertical(2) - x0y0(2)
+            intervalHor = coordHor(1) - coordCen(1)
+            intervalVer = coordVer(2) - coordCen(2)
     
         ! 3. Calculate vector without normalization 
-            vecX = 0.0D0 
-            vecY = 0.0D0 
+            vecHor = 0.0D0 
+            vecVer = 0.0D0 
             do j = 1, 3
                 do i = 1, NAtoms 
-                    vecX(i,j) = coordHor(i,j) - coordCenter(i,j)
-                    vecY(i,j) = coordVer(i,j) - coordCenter(i,j)
+                    vecHor(i,j) = strucHor(i,j) - strucCen(i,j)
+                    vecVer(i,j) = strucVer(i,j) - strucCen(i,j)
                 end do 
             end do 
         return 
-    end subroutine get_shift
+    end subroutine get_iniNeighbor
 
-    subroutine get_dRMSD(NAtoms,coordTraj,coordCenter,vec,interval,length,dRMSD)
+    subroutine get_dRMSD(NAtoms,strucTraj,strucCenter,vec,interval,length,dRMSD)
         ! Implement centered finite difference method, accuracy: O(h^2) 
         ! reference: Computational science and engineering I, MIT, G. Strang, Lecture 2
         ! https://ocw.mit.edu/courses/mathematics/18-085-computational-science-and-engineering-i-fall-2008/video-lectures/lecture-2-differential-eqns-and-difference-eqns/
         implicit none
         integer(4),intent(in)   :: NAtoms
-        real(8),dimension(NAtoms,3),intent(in)  :: coordTraj, coordCenter, vec 
+        real(8),dimension(NAtoms,3),intent(in)  :: strucTraj, strucCenter, vec 
         real(8),intent(in)  :: interval, length
         real(8),intent(out) :: dRMSD
         ! local variables 
         real(8), parameter :: pts = 100.0D0 
         real(8) :: dx  ! interval is the length of one grid, and dx is length / pts 
         real(8) :: RMSD_F, RMSD_B
-        real(8),dimension(NAtoms,3) :: coordForward, coordBackward ! coordShift
+        real(8),dimension(NAtoms,3) :: strucForward, strucBackward ! strucShift
 
         dx = interval / pts
         ! coordShift = 0.0D0 
-        coordForward = 0.0D0 
-        coordBackward = 0.0D0 
-        ! call get_CoordShift(NAtoms,coordCenter,vec,length,coordShift)
+        strucForward = 0.0D0 
+        strucBackward = 0.0D0 
+        ! call get_CoordShift(NAtoms,strucCenter,vec,length,strucShift)
 
-        call get_CoordShift(NAtoms,coordCenter,vec,length + dx,coordForward)
-        call get_CoordShift(NAtoms,coordCenter,vec,length - dx,coordBackward)
+        call get_CoordShift(NAtoms,strucCenter,vec,length + dx,strucForward)
+        call get_CoordShift(NAtoms,strucCenter,vec,length - dx,strucBackward)
 
-        call get_RMSD(NAtoms,coordTraj,coordForward,RMSD_F)
-        call get_RMSD(NAtoms,coordTraj,coordBackward,RMSD_B)
+        call get_RMSD(NAtoms,strucTraj,strucForward,RMSD_F)
+        call get_RMSD(NAtoms,strucTraj,strucBackward,RMSD_B)
         ! dRMSD = RMSD_F
         dRMSD = ( RMSD_F - RMSD_B ) / (2 * dx)
 
         return 
     end subroutine get_dRMSD
 
-    subroutine golden(NAtoms,xmn,xmx,coordTraj,coordCenter,vec,length)
+    subroutine get_1Dunimodal(XorY,zero, NAtoms,numPts,PESList,strucTraj,indexCen,indexNei,vec,interval,df2)
+        implicit none 
+        integer(4),intent(in) :: XorY, NAtoms, numPts  ! x: XorY=0, y: XorY=1
+        real(8), intent(in)  :: zero  
+        real(8),dimension(numPts,3),intent(in) :: PESList
+        real(8),dimension(NAtoms,3),intent(in) :: strucTraj   
+        integer(4),intent(inout)    :: indexCen
+        integer(4),intent(out)  :: indexNei
+        real(8),dimension(NAtoms,3),intent(out) :: vec
+        real(8),intent(out) :: interval
+        real(8),intent(inout)   :: df2
+        ! local variables 
+        integer(4)  :: i, indexHor, indexVer
+        real(8), parameter  :: moveL = 0.5D0
+        real(8) :: length, intervalHor, intervalVer
+        real(8) :: df1, Prod1, Prod2
+        real(8),dimension(NAtoms,3) :: strucCen, strucHor, strucVer
+        real(8),dimension(NAtoms,3) :: vecHor, vecVer
+        ! write(*,*) strucTraj(1,:)
+        ! 1. Calculate dRMSD at the initial point
+            call get_iniNeighbor(NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,indexVer,intervalHor,intervalVer,vecHor,vecVer)
+
+            ! output: strucCen
+            call pickPESstruc(indexCen,NAtoms,strucCen)
+
+            ! output: vec, interval
+            if ( XorY .eq. 0 ) then  ! Horizental direction; XorY = 0 
+                vec = vecHor
+                interval = intervalHor
+            else ! Vertical direction; XorY = 1
+                vec = vecVer
+                interval = intervalHor
+            end if
+            
+            ! output: df1 = dRMSD
+            ! get_dRMSD() calculates the new structure inside the subroutine 
+            length = 0.0D0 
+            call get_dRMSD(NAtoms,strucTraj,strucCen,vec,interval,length,df1) 
+
+        ! 2. Find unimodal region 
+        ! If the product of two derivatives is positive, there is no extreme in between, 
+        ! otherwise, if it is negative, an extreme exists. 
+
+            ! 2019/09/10, Grace, If the trajectory is exactly on this surface, 
+            !   it should stop at the first while loop. Such that, set df2 = df1. 
+            df2 = df1 
+           
+            Prod1 = df1 * df2 
+            Prod2 = Prod1
+            i = 0 
+            do while ( Prod2 .gt. zero )
+                i = i + 1 
+                ! write(*,*) 'inside1Dunimodal',i,prod2
+                if ( i .ge. numPts ) exit !2019/09/19, Grace
+                df1 = df2 
+                
+                ! Calculate the new $length 
+                ! 2019/09/05, Grace, change $vec since this PES is not linear,
+                ! and the range of length is 
+                ! positive direction: 0.0D0  <= $length <= 1.0D
+                ! negative direction: -1.0D0 <= $length <= 0.0D0
+                ! If the variable, $length, is not stay in above region, change the relative variables.
+                ! If length changes, the relative variables need to replace as well. 
+                if (  abs(int(length)) .eq. 0  ) then 
+                    ! move in the same direction 
+                    call get_length(indexCen,indexHor,indexVer,XorY,moveL,length)
+                else ! Move point to extent region, desire ouptut: length, strucCen, vec, interval 
+
+                    ! move the original point to the select one
+                    if ( XorY .eq. 0 ) then ! Horizental direction; XorY = 0 
+                        indexCen = indexHor
+                    else ! Vertical direction; XorY = 1
+                        indexCen = indexVer
+                    end if
+
+                    ! output: indexHor, indexVer, intervalHor, intervalVer, vecHor, vecVer
+                    call get_iniNeighbor(NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,indexVer,intervalHor,intervalVer,vecHor,vecVer)
+
+                    ! output: coord, vec, interval
+                    if ( XorY .eq. 0 ) then ! Horizental direction; XorY = 0 
+                        vec = vecHor
+                        interval = intervalHor
+                    else ! Vertical direction; XorY = 1
+                        vec = vecVer 
+                        interval = intervalVer
+                    end if
+
+                    ! output: strucCen
+                    call pickPESstruc(indexCen,NAtoms,strucCen)
+
+                    ! output: length 
+                    length = 0.0D0
+                end if
+                
+                ! Desire new parameters to calculate a new dRMSD: 
+                ! 1. $strucCen, 2. $vec, 3. $interval, 4. $length
+                ! output: df2 = dRMSD/dx 
+                call get_dRMSD(NAtoms,strucTraj,strucCen,vec,interval,length,df2)
+
+                Prod2 = df1 * df2 
+                ! write(*,*) Prod2, length 
+            end do
+
+            if ( XorY .eq. 0 ) then 
+                ! x-direction
+                indexNei = indexHor
+            else 
+                ! y-direction
+                indexNei = indexVer
+            end if
+        return 
+    end subroutine get_1Dunimodal
+
+    subroutine get_2Dunimodal(zero,NAtoms,numPts,PESList,strucTraj,indexCen,vecHor,vecVer,intervalHor,intervalVer,prodHor,prodVer)
+        implicit none 
+        integer(4),intent(in)   :: NAtoms, numPts
+        real(8),intent(in)  :: zero 
+        real(8),dimension(numPts,3),intent(in) :: PESList
+        real(8),dimension(NAtoms,3),intent(in) :: strucTraj   
+        integer(4),intent(inout)    :: indexCen 
+        real(8),intent(inout)   :: intervalHor, intervalVer, prodHor, prodVer  
+        real(8),dimension(NAtoms,3),intent(inout) :: vecHor, vecVer
+        ! local variable
+        integer(4)   :: i, XorY, indexHor, indexVer, indexCentmp
+        real(8) :: length,  df1, dfHor, dfVer
+        real(8),dimension(NAtoms,3) :: strucCen
+        
+            
+            XorY = 0
+            call get_1Dunimodal(XorY,zero, NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,vecHor,intervalHor,dfHor)
+
+            indexCentmp = indexCen 
+            XorY = 1 
+            call get_1Dunimodal(XorY,zero, NAtoms,numPts,PESList,strucTraj,indexCentmp,indexVer,vecVer,intervalVer,dfVer)
+
+            i = 0 
+            do while ( indexCen .ne. indexCentmp )
+                i = i + 1 
+                if ( i .eq. 10 ) exit ! 2019/10/03, Grace
+                indexCen = indexCentmp 
+                XorY = 0
+                call get_1Dunimodal(XorY,zero, NAtoms,numPts,PESList,strucTraj,indexCen,indexHor,vecHor,intervalHor,dfHor)
+
+                indexCentmp = indexCen 
+                XorY = 1 
+                call get_1Dunimodal(XorY,zero, NAtoms,numPts,PESList,strucTraj,indexCentmp,indexVer,vecVer,intervalVer,dfVer)
+                ! write(*,*) indexCen,indexCentmp
+            end do 
+
+            call pickPESstruc(indexCen,NAtoms,strucCen)
+            length = 0.0D0 
+            call get_dRMSD(NAtoms,strucTraj,strucCen,vecHor,intervalHor,length,df1) 
+
+            ! length = 1.0D0 
+            ! call get_dRMSD(NAtoms,strucTraj,strucCen,vecHor,intervalHor,length,df2) 
+            prodHor = df1 * dfHor 
+
+            ! call get_dRMSD(NAtoms,strucTraj,strucCen,vecVer,intervalVer,length,df2) 
+            prodVer = df1 * dfVer
+            ! write(*,*) '1Dunimodal',indexCen,df1,dfHor,dfVer
+        return 
+    end subroutine get_2Dunimodal 
+
+    subroutine get_1DGSS(XorY,NAtoms,numPts,PESList,indexCen,indexNei,vec,interval,strucTraj,coord)
         ! 2019/09/10, Grace, Golden section search
         ! ref: https://www.essie.ufl.edu/~kgurl/Classes/Lect3421/NM6_optim_s02.pdf
         ! Golden ratio: https://en.wikipedia.org/wiki/Golden_ratio
         implicit none
-        integer(4),intent(in)   :: NAtoms
-        real(8),dimension(NAtoms,3),intent(in)  :: coordTraj, coordCenter, vec
-        real(8),intent(inout)  :: xmn, xmx
-        real(8),intent(out)  :: length
+        integer(4),intent(in)   :: XorY, NAtoms, numPts, indexCen, indexNei
+        real(8),dimension(NAtoms,3),intent(in)  :: strucTraj,vec
+        real(8),dimension(numPts,3),intent(in)  :: PESList
+        real(8),intent(in)  :: interval
+        real(8),intent(out)  :: coord
         ! local variables,
-        real(8) :: x1, x2, rmsd_x1,rmsd_x2,err
+        real(8) :: x1, x2, rmsdX1,rmsdX2,err, xmin, xmax, length, coordIni, coordNei
+        real(8) :: intervalHor, intervalVer
         real(8),parameter   :: R = 0.6183D0, C = 1.0D0 - R ! Golden ratio
-        real(8),parameter   :: tol = 0.0001D0 !  tolerance 
-        real(8),dimension(NAtoms,3) :: coord_x1, coord_x2
-    
-        err = C * ( xmx - xmn )
-        do while ( err .lt. tol )
+        real(8),parameter   :: tol = 0.00001D0 !  tolerance 
+        real(8),dimension(NAtoms,3) :: strucCen, strucNei
+        real(8),dimension(NAtoms,3) :: strucX1, strucX2, vecHor, vecVer
+        integer(4)  :: indexHor, indexVer, i, j 
+
+        ! 1. 
+        call pickPESstruc(indexCen,NAtoms,strucCen)
+
+        if ( XorY .eq. 0 ) then  
+            ! x coordinate; XorY = 0 
+            coordIni = PESList(indexCen,1)
+        else 
+            ! y coordinate; XorY = 1 
+            coordIni = PESList(indexCen,2)
+        end if
+
+        xmin = 0.0D0 
+        xmax = 1.0D0 
+        err = C * ( xmax - xmin )
+        do while ( err .gt. tol )
             ! 1. Deivde interval into 3 sections by adding two internal points between ends
-            x1 = xmx - R * ( xmx - xmn )
-            x2 = xmn + R * ( xmx - xmn )
+            x1 = xmax - R * ( xmax - xmin )
+            x2 = xmin + R * ( xmax - xmin )
 
             ! 2. Evalute the function at the two internal points
-            call get_CoordShift(NAtoms,coordCenter,vec,x1,coord_x1)
-            call get_CoordShift(NAtoms,coordCenter,vec,x2,coord_x2)
+            call get_CoordShift(NAtoms,strucCen,vec,x1,strucX1)
+            call get_CoordShift(NAtoms,strucCen,vec,x2,strucX2)
 
-            call get_RMSD(NAtoms,CoordTraj,coord_x1,rmsd_x1)
-            call get_RMSD(NAtoms,CoordTraj,coord_x2,rmsd_x2)
+            call get_RMSD(NAtoms,strucTraj,strucX1,rmsdX1)
+            call get_RMSD(NAtoms,strucTraj,strucX2,rmsdX2)
 
-            if ( rmsd_x1 .gt. rmsd_x2 ) then
-                xmx = x2
+            if ( rmsdX1 .gt. rmsdX2 ) then
+                xmax = x2
             else
-                xmn = x1 
+                xmin = x1 
             end if 
-            err = C * ( xmx - xmn )
+            err = C * ( xmax - xmin )
+            ! write(*,'(4(F5.2,1X))') x1, x2, err, tol 
         end do 
 
         length = ( x2 - x1 ) / 2.0D0 
 
+        coord = coordIni + interval * length 
+        ! write(*,*) coord, coordIni, interval, length 
+        ! write(*,*) length 
+        ! do i = 0, 10 
+        !     x1 = i * 1.0/10.0D0 
+        !     call get_CoordShift(NAtoms,strucCen,vec,x1,strucX1)
+        !     call get_RMSD(NAtoms,strucTraj,strucX1,rmsdX1)
+        !     write(*,*) x1, rmsdX1 
+        ! end do 
+        ! write(*,'()') 
         return 
-    end subroutine golden 
+    end subroutine get_1DGSS 
 end module extractData
 
 Program main
@@ -717,6 +1074,7 @@ Program main
         
     stop
 End program main
+
 
 subroutine findFirstPt(NAtoms,numPts,tss_index)
     use extractData
@@ -780,7 +1138,7 @@ subroutine findOtherPts(NAtoms,numPts,PESList,tss_index)
 
         open(10,file=outputFile,status='old')
         open(999,file=finalOutput,status='replace')
-        do i = 1, numLine - 1 ! remove TSS
+        do i = 1, numLine - 1 ! remove TSS 
             read(10,'(A)') buffer
             write(999,'(A)') TRIM(ADJUSTL(buffer))
         end do
@@ -791,7 +1149,7 @@ subroutine findOtherPts(NAtoms,numPts,PESList,tss_index)
         ! write(*,'()')
         
     ! 4. Search the coordinate for the last half trajectory, print the TSS
-    !   coordinate as well.
+    !   coordinate as well. 
         inputFile = 'half2Traj.xyz'
         outputFile = 'coord.'//TRIM(ADJUSTL(inputFile))
         call GETARG(5,cstr_f)
@@ -810,6 +1168,8 @@ subroutine findOtherPts(NAtoms,numPts,PESList,tss_index)
         ! close(10)
         close(10,status='delete')
 
+    ! 5. Close file ID after finish printing out the coordinate for both backward and 
+    !   forward direction. Kill both tmp files as well. 
         close(999)
         call system('rm -f half1Traj.xyz half2Traj.xyz' )
         ! write(*,*) cstr_r,cstr_f
@@ -826,9 +1186,9 @@ subroutine coordHalfTraj(NAtoms,numPts,PESList,tss_index,cstr,inputFile,outputFi
     ! cstr = constraint for reverse/forward directions; defR.dat or defP$n.dat
     ! local variables 
     real(8),dimension(2)    :: tune_coord
-    real(8),dimension(NAtoms,3) :: tssTraj, oneCoord 
-    character(len=100)  :: charline, charline2, filename 
-    integer(4)  :: numline, oneJob, numjobs, inIndex, outIndex
+    real(8),dimension(NAtoms,3) :: tssTraj, oneStruc
+    character(len=100)  :: charline, charline2, filename
+    integer(4)  :: numline, oneJob, numTrajPts, inIndex, outIndex
     integer(4)  :: i, iniL, finL
 
     ! 1.  Count the total amount of points of one trajectory (i.e. numjobs).
@@ -838,7 +1198,7 @@ subroutine coordHalfTraj(NAtoms,numPts,PESList,tss_index,cstr,inputFile,outputFi
         read(10,*) numline
         close(10,status='delete')
         oneJob = NAtoms + 2 
-        numjobs = numline / oneJob
+        numTrajPts = numline / oneJob
 
     ! 2. The coordinate of the first point (TSS) is already founded, 
     !   tune this coordinate, and then save it in outputFile
@@ -846,23 +1206,23 @@ subroutine coordHalfTraj(NAtoms,numPts,PESList,tss_index,cstr,inputFile,outputFi
         call pickTssTraj(NAtoms,tssTraj)
 
         ! Tune the coordinate in both x and y directions
-        ! call tuneTraj2(NAtoms,numPts,PESList,tssTraj,inIndex,tune_coord)
+        call tuneTraj(NAtoms,numPts,PESList,tssTraj,inIndex,tune_coord)
 
         open(20,file=outputFile,status='replace')
-        write(20,"(3(F15.8,1X))") PESList(inIndex,1:3) ! turn-off tuneTraj2()
-        write(*,"(3(F15.8,1X))") PESList(inIndex,1:3) ! turn-off tuneTraj2()
-        ! write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(inIndex,3)
+        ! write(20,"(3(F15.8,1X))") PESList(inIndex,1:3) ! turn-off tuneTraj2()
+        ! write(*,"(3(F15.8,1X))") PESList(inIndex,1:3) ! turn-off tuneTraj2()
+        write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(inIndex,3)
 
         ! for debug 
             ! write(*,'()')
-            ! write(*,"(I3,1X,3(F15.8,1X))") inIndex, PESList(inIndex,1:3)
+            ! write(*,"(I4,1X,3(F15.8,1X))") inIndex, PESList(inIndex,1:3)
             ! write(*,"(3(F15.8,1X))") tune_coord(1:2),PESList(inIndex,3)
             ! stop
     
     ! 3. Search the coordinate of the rest  points.
         ! inIndex = tss_index 
         ! write(*,*) TRIM(ADJUSTL(inputFile))
-        do i = 2,  numjobs 
+        do i = 2,  numTrajPts 
             iniL = 1 + oneJob * ( i - 1 ) 
             finL = oneJob * i
             write(charLine,*) iniL
@@ -870,40 +1230,45 @@ subroutine coordHalfTraj(NAtoms,numPts,PESList,tss_index,cstr,inputFile,outputFi
             
             call system("sed -n '"//TRIM(ADJUSTL(charLine))//',' &
                 //TRIM(ADJUSTL(charline2))//" p' " & 
-                //TRIM(ADJUSTL(inputFile))// " > oneCoord.xyz")
-            filename = 'oneCoord.xyz'
-            call readStruc(filename,NAtoms,oneCoord)
+                //TRIM(ADJUSTL(inputFile))// " > oneStruc.xyz")
+            filename = 'oneStruc.xyz'
+            call readStruc(filename,NAtoms,oneStruc)
 
             ! Compare the neighest 8 neighbors, select the one with the smallest RMSD
             ! cstr = constraint for reverse/forward directions; defR.dat or defP$n.dat
-            call step2_select1from8(NAtoms,numPts,oneCoord,cstr,inIndex,outIndex)
-            
+            call step2_select1fromNeighbors(NAtoms,numPts,oneStruc,cstr,inIndex,outIndex)
             
             ! Tune the coordinate in both x and y directions
-            ! call tuneTraj2(NAtoms,numPts,PESList,tssTraj,outIndex,tune_coord)
+            call tuneTraj(NAtoms,numPts,PESList,oneStruc,outIndex,tune_coord)
 
             inIndex = outIndex 
-            write(20,"(3(F15.8,1X))") PESList(outIndex,1:3) ! turn-off tuneTraj2()
-            ! write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
+            ! write(20,"(3(F15.8,1X))") PESList(outIndex,1:3) ! turn-off tuneTraj2()
+            write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
             ! write(*,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
+            ! write(*,'(A)') '---------------------------'
         end do 
         close(10)
     return 
 end subroutine coordHalfTraj
 
-subroutine step2_select1from8(NAtoms,numPts,coordTraj,cstr,inIndex,outIndex)
+subroutine step2_select1fromNeighbors(NAtoms,numPts,strucTraj,cstr,inIndex,outIndex)
     use extractData
     implicit none 
     integer(4),intent(in)   :: NAtoms, numPts, inIndex
-    real(8),dimension(NAtoms,3),intent(in)  :: coordTraj
+    real(8),dimension(NAtoms,3),intent(in)  :: strucTraj
     character(len=100),intent(in)   :: cstr ! constraint for reverse/forward directions
     integer(4),intent(out)  :: outIndex 
     ! local variables 
-    integer(4),parameter :: numNeighbor = 8 
+    ! numNeighbor = 4, right, left, upper, lower neighbors
+    ! numNeighbor = 8, first shell 
+    ! numNeighbor = 24, first and second shell 
+    ! numNeighbor = 48, first, second and the third shell
+    integer(4),parameter :: numNeighbor = 48
+
     integer(4),dimension(numNeighbor) :: neighbors  
     integer(4)  :: i
     real(8) :: rmsd1, rmsd2 
-    real(8),dimension(NAtoms,3) :: coordPES
+    real(8),dimension(NAtoms,3) :: strucPES
 
     call vaildNeighbors(inIndex,numPts,cstr,numNeighbor,neighbors)
     ! write(*,'(9(I4,1X))') inIndex,neighbors
@@ -911,8 +1276,8 @@ subroutine step2_select1from8(NAtoms,numPts,coordTraj,cstr,inIndex,outIndex)
     rmsd1 = 10000.D0 ! to be replaced
     do i = 1, numNeighbor
         if ( neighbors(i) .eq. 0 ) cycle
-        call pickPESstruc(neighbors(i),NAtoms,coordPES)
-        call get_RMSD(NAtoms,coordTraj,coordPES,rmsd2)
+        call pickPESstruc(neighbors(i),NAtoms,strucPES)
+        call get_RMSD(NAtoms,strucTraj,strucPES,rmsd2)
         ! write(*,*) rmsd2
         if ( rmsd1 .gt. rmsd2 ) then 
             rmsd1 = rmsd2
@@ -921,206 +1286,49 @@ subroutine step2_select1from8(NAtoms,numPts,coordTraj,cstr,inIndex,outIndex)
         ! write(*,*) i,inIndex, outIndex
         ! write(*,*) neighbors(:)
     end do 
-    
     return 
-end subroutine step2_select1from8
+end subroutine step2_select1fromNeighbors
 
-subroutine tuneTraj2(NAtoms,numPts,PESList,coordTraj,center,coord)
+subroutine tuneTraj(NAtoms,numPts,PESList,strucTraj,indexCen,coord)
     use extractData
     implicit none
-    integer(4),intent(in)   :: NAtoms, numPts, center
+    integer(4),intent(in)   :: NAtoms, numPts
     real(8),dimension(numPts,3),intent(in) :: PESList
-    real(8),dimension(NAtoms,3),intent(in) :: coordTraj   
+    real(8),dimension(NAtoms,3),intent(in) :: strucTraj   
+    integer(4),intent(inout)    :: indexCen
     real(8),dimension(2),intent(out)    :: coord
     ! local variables 
-    integer(4)  :: i
+    integer(4)  :: i, XorY, indexHor, indexVer, indexCentmp
+    real(8) :: prodHor, prodVer,intervalHor, intervalVer
+    real(8),dimension(NAtoms,3) :: vecHor, vecVer
+    real(8),parameter  :: zero = 0.00001D0 ! do not change this parameter
 
-    ! x = x0 + shift_x
-    ! y = y0 + shift_y
+        ! Calculate new coordinate if its derivative of RMSD is near to zero.
+        ! 1. Locate a unimodal area; constrain a point of trajectory in 
+        !   certain region which has a local minimum. 
 
-        ! 3.2. Calculate new coordinate if its derivative of RMSD is near to zero.
-            coord = 0.0D0 
-            do i = 1, 2 ! 2019/09/20, Grace, order of indeice do not affect the result
-                call get_zero_dRMSD(NAtoms,numPts,PESList,coordTraj,center,i,coord(i))
-            end do
-            ! write(*,*) coord 
-    return 
-end subroutine tuneTraj2
+            ! initialize 
+            call get_2Dunimodal(zero,NAtoms,numPts,PESList,strucTraj,indexCen,vecHor,vecVer,intervalHor,intervalVer,prodHor,prodVer)
 
-! 1D numerical optimization
-subroutine get_zero_dRMSD(NAtoms,numPts,PESList,strucTraj,center,XorY,coord)
-    use extractData
-    implicit none 
-    integer(4),intent(in)   :: NAtoms, numPts, XorY
-    real(8),dimension(numPts,3),intent(in) :: PESList
-    real(8),dimension(NAtoms,3),intent(in)  :: strucTraj
-    integer(4),intent(inout)   :: center
-    real(8),intent(inout)  :: coord
-    ! local variables 
-    integer(4)  :: i, indexX, indexY, tmpX, tmpY
-    real(8) :: coord_ini, interval, length, minLini, minLfin, df1, df2, Prod1, Prod2
-    real(8), parameter  :: zero = 0.01D0 ! Careful for setting this value; cannot be too small 
-    real(8), parameter  :: MaxDer = 1.0D0 
-    real(8), parameter  :: moveL = 0.5D0 ! if modify this variable, the if condition need to modify as well
-    real(8), dimension(2)    :: intervalXandY
-    real(8), dimension(NAtoms,3) :: vec, vecX, vecY, strucCenter
-
-    ! 1. Calculate the derivative of RMSD at the initial point
-        ! Since x = x0 + shift_x (so as y), in order to generate shift value; shift_x,
-        ! call the subroutine to get the following output: 
-        ! output: indexX, indexY, intervalXandY, vecX, vecY
-        call get_shift(NAtoms,numPts,PESList,strucTraj,center,indexX,indexY,intervalXandY,vecX,vecY) 
-
-        ! output: coord, vec, interval
-        if ( XorY .eq. 1 ) then  
-            ! x coordinate
-            coord_ini = PESList(center,1)
-            vec = vecX
-            interval = intervalXandY(1)
-        else 
-            ! y coordinate
-            coord_ini = PESList(center,2)
-            vec = vecY 
-            interval = intervalXandY(2)
-        end if
-        
-        ! output: strucCenter 
-        call pickPESstruc(center,NAtoms,strucCenter)
-
-        ! output: df1 = dRMSD
-        ! This surroutine calculates the new length and new structure already
-        length = 0.0D0 
-        call get_dRMSD(NAtoms,strucTraj,strucCenter,vec,interval,length,df1) 
-
-        ! 2019/09/04, Grace, discard this trajectory if the difference 
-        !   between the structure of trajectory and the structure of 
-        !   potential is too much. c.f. df1 = dRMSD/dx. 
-            if ( ( df1 .lt. - MaxDer ) .or. ( df1 .gt. MaxDer ) ) then 
-                write(*,'(A)') 'Fail at mapping trajtory'
-                write(*,'(A)') 'Error: get_zero_dRMSD() in MapTraj.f90'
-                stop
-            end if 
-
-    ! 2. Search a local minimum where it is the new coordinate
-        ! 2.1 Reduce the searching region that confine one local minimum in $moveL length. 
-
-            ! 2019/09/10, Grace, If the trajectory is exactly on this surface, 
-            !   it should stop at the first while loop. Such that, set df2 = df1. 
-            df2 = df1 
-
-            ! If the product of two derivatives is positive, there is no extreme in between, 
-            ! otherwise, if it is negative, an extreme exists. 
-            Prod1 = df1 * df2 
-            Prod2 = Prod1
-            coord = coord_ini
-            ! write(*,*) 'before search: ', center
-                ! FIXME: too many loops- set up an exit criteria
             i = 0 
-            do while ( Prod2 .gt. zero )
-                i = i + 1 
-                if ( i .ge. numPts ) exit !2019/09/19, Grace
-                df1 = df2 
-                
-                ! Calculate the new $length 
-                ! 2019/09/05, Grace, change $vec since this PES is not linear,
-                ! and the range of length is 
-                ! positive direction: 0.0D0  <= $length <= 1.0D
-                ! negative direction: -1.0D0 <= $length <= 0.0D0
-                ! If the variable, $length, is not stay in above region, change the relative variables.
-                ! If length changes, the relative variables need to replace as well. 
-                if (  int(length) .eq. 0  ) then 
-                    ! ( ( length .ge. 0 + zero  ) .and. ( length .le. 1 ) ).or. & ! positive direction 
-                    !  ( ( length .ge. -1 ) .and. ( length .le. 0 ) )     & ! negative direction 
-                    ! ) then 
-                    call get_length(center,indexX,indexY,XorY,moveL,length)
-                else ! Move point to extent region, desire ouptut: length, strucCenter, vec, interval 
-                    ! move the original point to the select one; tmpX or tmpY
-                    if ( XorY .eq. 1 ) then 
-                        ! x-direction
-                        call filter2TwoNeighbors(NAtoms,numPts,PESList,strucTraj,indexX,tmpX,tmpY)
-                        center = tmpX
-                    else
-                        ! y-direction
-                        call filter2TwoNeighbors(NAtoms,numPts,PESList,strucTraj,indexY,tmpX,tmpY)
-                        center = tmpY
-                    end if
-
-                    ! output: indexX, indexY, intervalXandY, vecX, vecY
-                    call get_shift(NAtoms,numPts,PESList,strucTraj,center,indexX,indexY,intervalXandY,vecX,vecY) 
-
-                    ! output: coord, vec, interval
-                    if ( XorY .eq. 1 ) then 
-                        ! x-direction
-                        coord_ini = PESList(center,1)
-                        vec = vecX
-                        interval = intervalXandY(1)
-                    else 
-                        ! y-direction
-                        coord_ini = PESList(center,2)
-                        vec = vecY 
-                        interval = intervalXandY(2)
-                    end if
-
-                    ! output: strucCenter 
-                    call pickPESstruc(center,NAtoms,strucCenter)
-
-                    ! output: length 
-                    length = 0.0D0 
-                    call get_length(center,indexX,indexY,XorY,moveL,length)
-                end if
-            
-                ! Desire new parameters to calculate a new dRMSD: 
-                ! 1. $strucCenter, 2. $vec, 3. $interval, 4. $length
-                ! output: df2 = dRMSD/dx 
-                call get_dRMSD(NAtoms,strucTraj,strucCenter,vec,interval,length,df2)
-
-                ! Calculate the new coordinate
-                coord = coord_ini + interval * length
-
-                Prod2 = df1 * df2 
+            do while ( ( prodHor .gt. zero ) .or. (prodVer .gt. zero ) )
+                i = i + 1
+                call get_2Dunimodal(zero,NAtoms,numPts,PESList,strucTraj,indexCen,vecHor,vecVer,intervalHor,intervalVer,prodHor,prodVer)
+                if ( i .eq. 10 ) exit ! 2019/10/03, Grace
+                ! write(*,*) '2Dunimodal',i,prodHor, prodVer
             end do
-            ! write(*,*) 'after search: ', center, XorY
-            ! write(*,'(2(F6.3,1X))') coord, coord_ini + interval * length
-            ! write(*,'()')
-        ! 2.2 Find a local minimum; condition: - zero < dRMSD/dx < zero
-            coord_ini = coord
-            minLini = 0.0D0 
-            minLfin = 0.0D0
-            ! write(*,*) 'index and coord: ', center, coord
-            ! If the product of dRMSD is not zero, then use golden-section search to find it.
-            if ( ( Prod2 .lt. - zero ) .or. ( Prod2 .gt. zero ) ) then     
-                ! output: minLini, minLfin
-                if ( XorY .eq. 1 ) then 
-                    ! x coordinate 
-                    if ( center .lt. indexX) then 
-                        ! positive direction 
-                        minLini = length - moveL 
-                        minLfin = length 
-                    else
-                        ! negative direction 
-                        minLini = length 
-                        minLfin = length + moveL 
-                    end if
-                else
-                    ! y coordinate 
-                    if ( center .lt. indexY) then 
-                        ! positive direction 
-                        minLini = length - moveL 
-                        minLfin = length 
-                    else
-                        ! negative direction 
-                        minLini = length 
-                        minLfin = length + moveL 
-                    end if
-                end if 
-                
-                call golden(NAtoms,minLini,minLfin,strucTraj,strucCenter,vec,length)
 
-                coord = coord_ini + interval * length 
-            end if
-            ! write(*,*) 'after find local minimum: ', coord
-            ! write(*,*) minLini, minLfin,length 
-            ! coord = coord + interval * length 
+            ! write(*,*) indexCen 
+            ! write(*,*) prodHor, prodVer
+            
+            ! coord(1) = PESList(indexCen,1)
+            ! coord(2) = PESList(indexCen,2)
+        ! 2. Golden-section search 
+            coord = 0.0D0 
+            XorY = 0
+            call get_1DGSS(XorY,NAtoms,numPts,PESList,indexCen,indexHor,vecHor,intervalHor,strucTraj,coord(1))
+            XorY = 1 
+            call get_1DGSS(XorY,NAtoms,numPts,PESList,indexCen,indexVer,vecVer,intervalVer,strucTraj,coord(2))
+
     return 
-end subroutine get_zero_dRMSD
-
+end subroutine tuneTraj

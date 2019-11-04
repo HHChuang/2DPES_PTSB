@@ -14,6 +14,8 @@
 # 2019/07/11, Grace, change the unit of reaction coord from #
 #   the amount of grid points to mass-weighted coordinate.  #
 #   And also modify it from square figure to recentangular. #
+# 2019/09/24, Grace, add VRIregion(); zoom-in the region    #
+#   between TSS1 and TSS2, and also colorcode this area.    #
 #############################################################
 
 import sys
@@ -26,20 +28,15 @@ import matplotlib.tri as tri
 from mpl_toolkits.mplot3d import Axes3D
 # from itertools import cycle
 
+workDir = os.getcwd()
+PATH_RP1 = workDir + '/RP1.coord/'
+PATH_RP2 = workDir + '/RP2.coord/'
 
-PATH_RP1 = '/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/run/H3CO/RP1.coord/'
-PATH_RP2 = '/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/run/H3CO/RP2.coord/'
-# PATH_RP3 = '/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/run/NCH1/Traj/IRC.coord/'
-
-PATH_fig = '/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/run/NCH1/'
+PATH_fig = workDir
 # title = '61*61=3721 pts'
-# title = '$H_{2}$O'
-# title = 'Optimized along the modified gradient'
-title = 'NCH5'
+title = ''
 xaxis = "IRC of TSS1 ($\sqrt{amu}\cdot$Bohr)"
-# xaxis = 'Bond length; O2-H1'
 yaxis = "IRC of TSS2 ($\sqrt{amu}\cdot$Bohr)"
-# yaxis = 'Bond angle; H3-O2-H1'
 zaxis = 'kcal/mol'
 plt.rcParams.update({'font.size': 14})
 
@@ -49,8 +46,8 @@ def main():
     X, Y, E, pts_name, pts_coord = getInput()
 
     # 2. plot 2D PES with important points
-    # twoDwPts(X, Y, E, pts_name, pts_coord)
-    VRIregion(X, Y, E, pts_name, pts_coord)
+    twoDwPts(X, Y, E, pts_name, pts_coord)
+    # VRIregion(X, Y, E, pts_name, pts_coord)
 
     # 3. plot 2D PES with mapping trajectories
     # twoDwTraj(X, Y, E, PATH_RP1, 'r-')  # red trajectories
@@ -139,7 +136,7 @@ def twoDwPts(X, Y, E, pts_name, pts_coord):
         for j in range(dim):
             relE[i][j] = (E[i][j] - E_R) * 627.5095
 
-    ct = plt.contour(X, Y, relE, 30, colors='k')
+    ct = plt.contour(X, Y, relE, 20, colors='k')
     plt.clabel(ct, inline=1, fmt='%1.0f', fontsize=8)  # value of contour
     plt.title(title)
     plt.xlabel(xaxis)
@@ -149,17 +146,27 @@ def twoDwPts(X, Y, E, pts_name, pts_coord):
 
     # plot important points
     npts = totline(str(sys.argv[2]))
-    # shift_x = [0.0, 0.0, 0.0, 0.0, 0.0]
-    # shift_y = [0.1, 0.1, 0.1, 0.1, -0.1]
+    # NCH1
+    shift_x = [0, -5, 1, 0, 0]
+    shift_y = [3, 1, 1, 3, -1]
     # H3CO
-    shift_x = [0.0, -0.3, -0.3, -0.1, -0.1]
-    shift_y = [0.3, 0.3, 0.3, 0.3, -0.2]
+    # shift_x = [0.0, -0.3, -0.3, -0.1, -0.1]
+    # shift_y = [0.3, 0.3, 0.3, 0.3, -0.2]
     for n in range(npts):
         plt.plot(pts_coord[n][0], pts_coord[n][1], 'ro')
-        plt.text(pts_coord[n][0]+shift_x[n], pts_coord[n][1]+shift_y[n],
-                 pts_name[n], weight='bold', backgroundcolor='white', verticalalignment='top', multialignment='right', fontsize=12)
+        plt.text(pts_coord[n][0] + shift_x[n], pts_coord[n][1]+shift_y[n],
+                 pts_name[n], weight='bold', backgroundcolor='white',
+                 verticalalignment='top', multialignment='right', fontsize=10)
     # order of savefig() and show() is important
-    fig.savefig(PATH_fig + '2DwPts.png', dpi=100)
+    # fig.savefig(PATH_fig + '2DwPts.png', dpi=100)
+
+    # label the VRI region within a red box
+    VRIheight = [3,6,3,3,6]
+    m = 5 # 1 = NCH1, 2 = NCH2, 3 = NCH3, 4 = NCH4 and 5 = NCH5
+    plt.plot( [ pts_coord[1][0], pts_coord[1][0] ], [ -VRIheight[m-1],  VRIheight[m-1] ], '-r')
+    plt.plot( [ pts_coord[1][0], pts_coord[2][0] ], [  VRIheight[m-1],  VRIheight[m-1] ], '-r')
+    plt.plot( [ pts_coord[2][0], pts_coord[2][0] ], [ -VRIheight[m-1],  VRIheight[m-1] ], '-r')
+    plt.plot( [ pts_coord[1][0], pts_coord[2][0] ], [ -VRIheight[m-1], -VRIheight[m-1] ], '-r')
 
     fig = plt.show()
     plt.close(fig)
@@ -197,7 +204,7 @@ def VRIregion(X, Y, E, pts_name, pts_coord):
 
     # plot important points
     npts = totline(str(sys.argv[2]))
-    shift_x = [0.0, 0.1, -0.85, 0.0, 0.0]
+    shift_x = [0.0, 0.1, -0.9, 0.0, 0.0]
     shift_y = [0.1, 0.5, 0.5, 0.1, -0.1]
     for n in range(npts):
         plt.plot(pts_coord[n][0], pts_coord[n][1], 'ro')
@@ -227,7 +234,7 @@ def twoDwTraj(X, Y, E, PATH, color):
         traj_X, traj_Y, traj_E = getTraj(PATH, nameTraj[i])
         plt.plot(traj_X, traj_Y, color)
 
-    fig.savefig(PATH_fig + '2DwTraj.png', dpi=100)
+    # fig.savefig(PATH_fig + '2DwTraj.png', dpi=100)
     fig = plt.show()
     plt.close(fig)
 
@@ -328,15 +335,18 @@ def threeDwPts(X, Y, E, pts_name, pts_coord):
 
     # plot important points
     npts = totline(str(sys.argv[2]))
+    # H3CO
+    shift_x = [-0.5, -0.6, -0.6, -0.8, -1.0]
+    shift_y = [0.3, 0.3, 0.3, 0.3, 0.4]
     for i in range(npts):
         pts_coord[i][2] = (pts_coord[i][2] - Renergy) * 627.5095
 
     for n in range(npts):
         ax.scatter(pts_coord[n][0], pts_coord[n][1],
                    pts_coord[n][2], marker='o', c='r', edgecolors='k', zorder=10)
-        ax.text(pts_coord[n][0] + 0.1, pts_coord[n][1]+0.1, pts_coord[n]
-                [2] + 2, pts_name[n], weight='bold', backgroundcolor='white', zorder=10, fontsize=6)
-    fig.savefig(PATH_fig + '3DwPts.png', dpi=100)
+        ax.text(pts_coord[n][0] + shift_x[n], pts_coord[n][1] + shift_y[n], pts_coord[n]
+                [2] + 2, pts_name[n], weight='bold', backgroundcolor='white', zorder=10, fontsize=12)
+    # fig.savefig(PATH_fig + '3DwPts.png', dpi=100)
     plt.show()
     plt.close(fig)
 

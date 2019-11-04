@@ -56,10 +56,10 @@ function main(){
                 countProg='/work/Grace/ProgDyn/Program/CountProd' 
             # 2. rotProg:
                 rotProg='/work/Grace/ProgDyn/Program/rot.py' 
-                # rotProg='/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/src'
+                # rotProg='/Users/Grace/GoogleNTU_Drive/Code/GitHub/2DPES_PTSB/src/rot.py'
             # 3. mapProg: 
                 mapProg='/work/Grace/ProgDyn/Program/MapTraj'
-                # mapProg='/Users/Grace/Google_Drive/Code/GitHub/2DPES_PTSB/src/MapTraj'
+                # mapProg='/Users/Grace/GoogleNTU_Drive/Code/GitHub/2DPES_PTSB/src/MapTraj'
 
             rawTraj="$home/DoneTraj"
             totTraj="$home/totTraj"
@@ -77,7 +77,7 @@ function main(){
     # Step 3. Classify trajectories by calling program CountProd.f90, assign 
     #   them into several groups based on user-defined criteria. 
     #   The main two groups are RP1 and RP2.
-        #FIXME:
+        #FIXME:     
         ##############################
         #  manyTraj $1 $2 $3 $totTraj
         ##############################
@@ -91,14 +91,17 @@ function main(){
         #FIXME: 
         ############################################################
         echo ''
-        echo 'Rotate trajectories, print RMSD befor/after.' 
+        echo 'Rotate trajectories, print RMSD befor/after rotation and translation.' 
         echo ''
-        adjustTraj $totTraj AnalysedTraj.dat $4 $5 
+        adjustTraj $totTraj AnalysedTraj.dat $4 $5 #output: $avg_rmsd_before, $avg_rmsd_after
+        echo 'Avg. RMSD before rotation: ' $avg_rmsd_before
+        echo 'Avg. RMSD after rotation: ' $avg_rmsd_after
+        echo ''
         ############################################################
         # Output: rot.*
  
     # Step 5. Map trajectory; search their corresponding coordinate on this 
-    #   numerical potential hypersurface.  Calling MapTraj.f90 to search coordinate.
+    #   numerical potential hypersurface. Calling MapTraj.f90 to search coordinate.
         ############################################################
         echo ''
         echo 'Search the corresponding coordinates.'
@@ -267,9 +270,22 @@ function adjustTraj(){
             iniL=$(( 1 + $jobL * ($order -1) ))
             finL=$(( $jobL * $order ))
             sed -n "$iniL,$finL p" $4 > tss.PES.xyz
-            $rotProg tss.$name tss.PES.xyz $name # output: rot.$name 
-        done 
-    rm -f tss.* list.dat tss.PES.xyz
+            $rotProg tss.$name tss.PES.xyz $name | tee -a rmsd.dat # output: rot.$name, rmsd.dat 
+    done 
+    # Calculate the average of RMSD before/after rotation and translation
+    njobs=$(wc -l rmsd.dat | awk '{print $1}')
+    avg_rmsd_before=0.0
+    avg_rmsd_after=0.0
+    for ((i=1;i<=$njobs;i++))
+    do 
+        rmsd_before=$(sed -n "$i,$i p" rmsd.dat | awk '{print $1}')
+        rmsd_after=$(sed -n "$i,$i p" rmsd.dat | awk '{print $2}')
+        avg_rmsd_before=$( echo " $rmsd_before + $avg_rmsd_before" | bc)
+        avg_rmsd_after=$( echo " $rmsd_after + $avg_rmsd_after" | bc)
+    done
+    avg_rmsd_before=$( echo "scale=6; $avg_rmsd_before / $njobs " | bc)
+    avg_rmsd_after=$( echo " scale=6; $avg_rmsd_after  / $njobs " | bc)
+    rm -f tss.* list.dat tss.PES.xyz rmsd.dat
 }
 
 function mapTraj(){
