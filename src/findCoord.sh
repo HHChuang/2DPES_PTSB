@@ -31,6 +31,7 @@
 # 2019/07/23, Grace, change coordinate from integer to floating points  #
 # 2019/07/25, Grace, integrate lots functions and assign this script as #
 #   the working horse.                                                  #
+# 2019/11/05, Grace, fix bug of extractFinalPts                         #
 #                                                                       #
 #########################################################################
 
@@ -54,6 +55,7 @@ function main(){
             #   and then assign them by user-defined criteria. e.g. bond length 
             #   or bond angle of reactant or products. 
                 countProg='/work/Grace/ProgDyn/Program/CountProd' 
+                # countProg='/Users/Grace/GoogleNTU_Drive/Code/GitHub/2DPES_PTSB/src/CountProd'
             # 2. rotProg:
                 rotProg='/work/Grace/ProgDyn/Program/rot.py' 
                 # rotProg='/Users/Grace/GoogleNTU_Drive/Code/GitHub/2DPES_PTSB/src/rot.py'
@@ -69,7 +71,6 @@ function main(){
     # Step 2. Collect the rawadata trajectories (i.e. calculate from ProgDyn)
     #   to one directories and also rename them. Replace the atomic symbol to 
     #   integer and then standard output the total amount of trajectories. 
-        #FIXME:
         ##############################
         # collectTraj $rawTraj $totTraj
         ############################## 
@@ -77,45 +78,60 @@ function main(){
     # Step 3. Classify trajectories by calling program CountProd.f90, assign 
     #   them into several groups based on user-defined criteria. 
     #   The main two groups are RP1 and RP2.
-        #FIXME:     
         ##############################
         #  manyTraj $1 $2 $3 $totTraj
-        ##############################
-        # Output:
-        #   1. AnalysedTraj.dat 
-        #   2. SummaryTraj.dat 
+        #################################
+        # Output:                       #
+        #   1. $home/AnalysedTraj.dat   #
+        #   2. $home/SummaryTraj.dat    #
+        #################################
 
     # Step 4. Calling rot.py to make rotational matrix based on the overlap of the
     #   first point of trajectory and the TSS1 of potential. Apply this matrix on 
     #   this trajectory. 
-        #FIXME: 
         ############################################################
-        echo ''
-        echo 'Rotate trajectories, print RMSD befor/after rotation and translation.' 
-        echo ''
-        adjustTraj $totTraj AnalysedTraj.dat $4 $5 #output: $avg_rmsd_before, $avg_rmsd_after
-        echo 'Avg. RMSD before rotation: ' $avg_rmsd_before
-        echo 'Avg. RMSD after rotation: ' $avg_rmsd_after
-        echo ''
+        # echo ''
+        # echo 'Rotate trajectories, print RMSD before/after rotation and translation.' 
+        # echo ''
+        # adjustTraj $totTraj $home/AnalysedTraj.dat $home/$4 $home/$5 
+        # #output: $avg_rmsd_before, $avg_rmsd_after
+        # echo 'Avg. RMSD before rotation: ' $avg_rmsd_before
+        # echo 'Avg. RMSD after rotation: ' $avg_rmsd_after
+        # echo ''
         ############################################################
         # Output: rot.*
  
     # Step 5. Map trajectory; search their corresponding coordinate on this 
     #   numerical potential hypersurface. Calling MapTraj.f90 to search coordinate.
         ############################################################
-        echo ''
-        echo 'Search the corresponding coordinates.'
-        echo ''
-        time mapTraj $totTraj AnalysedTraj.dat $4 $5 | tee stdMapTraj.dat 
-        rm -rf $RP1dir $RP2dir
-        mkdir $RP1dir 
-        mkdir $RP2dir
-        echo 'Output directories: RP1.coord and RP2.coord'
-        moveTraj AnalysedTraj.dat $totTraj $RP1dir $RP2dir 
+        # echo ''
+        # echo 'Search the corresponding coordinates.'
+        # echo ''
+        # time mapTraj $totTraj AnalysedTraj.dat $4 $5 | tee $home/stdMapTraj.dat 
+        # echo 'Output directories: RP1.coord and RP2.coord'
+        # # 1. reorder trajectories which unifiy to start from reactant 
+        # reorderTraj $totTraj $home/AnalysedTraj.dat  #output: $totTraj/list.dat 
+        # # 2. move total trajectories to selected directories 
+        # rm -rf $RP1dir $RP2dir
+        # mkdir $RP1dir 
+        # mkdir $RP2dir
+        # moveTraj $home/AnalysedTraj.dat $totTraj $RP1dir $RP2dir 
+        #############################################
+        # Output:                                   #
+        #   1. stdMapTraj.dat                       #
+        #   2. coord.* in /$RP1dir and /$RP2dir     #
+        #############################################
+
+    # Step 6. Split coordinate of trajectories into several sections    
         ############################################################
-        # Output: 
-        #   1. stdMapTraj.dat 
-        #   2. coord.* in /$RP1dir and /$RP2dir
+        intervalT=(60 70)
+        echo ''
+        echo 'Split trajectories into '
+        echo ''
+        
+        splitCoord $RP1dir ${intervalT[@]}
+        splitCoord $RP2dir ${intervalT[@]}
+        ############################################################
 }
 
 function collectTraj(){
@@ -160,12 +176,12 @@ function extractFinalPts(){
     #   2. Pts2.xyz 
 
     NAtoms=$(head -n 1 $1)
-    tail -n $(( $NAtoms + 2 )) $1 > Pts1.xyz
-
+    tail -n $(( $NAtoms + 2 )) $1 > Pts2.xyz 
+    #2019/11/05, reverse the order of the last point which is important 
     tmpL=$(grep -n 'runpoint 1' $1 | tail -n 1 | cut -d ':' -f 1)
     finL=$(( $tmpL - 2 ))
     iniL=$(( $finL - $NAtoms -1  ))
-    sed -n "$iniL,$finL p" $1 > Pts2.xyz
+    sed -n "$iniL,$finL p" $1 > Pts1.xyz
 }
 
 function manyTraj(){
@@ -208,12 +224,12 @@ function manyTraj(){
         RR=$(grep -c 'R R' AnalysedTraj.dat )
         P1P1=$(grep -c 'P1 P1' AnalysedTraj.dat )
         P2P2=$(grep -c 'P2 P2' AnalysedTraj.dat )
-        NR=$(grep -c 'none R' AnalysedTraj.dat )
-        NP1=$(grep -c 'none P1' AnalysedTraj.dat )
-        NP2=$(grep -c 'none P2' AnalysedTraj.dat )
-        P1P2=$(grep -c 'P1 P2' AnalysedTraj.dat )
-        RP1=$(grep -c 'R P1' AnalysedTraj.dat )
-        RP2=$(grep -c 'R P2' AnalysedTraj.dat )
+        NR=$(grep  'none' AnalysedTraj.dat | grep -c 'R')
+        NP1=$(grep 'none' AnalysedTraj.dat | grep -c 'P1')
+        NP2=$(grep 'none' AnalysedTraj.dat | grep -c 'P2')
+        P1P2=$(grep 'P1' AnalysedTraj.dat | grep -c 'P2')
+        RP1=$(grep 'R' AnalysedTraj.dat | grep -c 'P1')
+        RP2=$(grep 'R' AnalysedTraj.dat | grep -c 'P2')
         tot=$(( $NN + $RR + $P1P1 + $P2P2 + $NR + $NP1 + $NP2 + $P1P2 + $RP1 + $RP2 ))
 
 cat << EOF | tee $home/SummaryTraj.dat 
@@ -238,26 +254,28 @@ cat << EOF | tee $home/SummaryTraj.dat
 ----------------------------------------------------------------
 EOF
     cp AnalysedTraj.dat $home 
+    rm -f AnalysedTraj.dat 
 }
 
 function adjustTraj(){
     # Use rot.py to rotate molecules 
     # Input: 
     #   $1 = $totTraj 
-    #   $2 = AnalysedTraj.dat
-    #   $3 = *_E.dat 
-    #   $4 = *_Struc.xyz 
+    #   $2 = $home/AnalysedTraj.dat
+    #   $3 = $home/*_E.dat 
+    #   $4 = $home/*_Struc.xyz 
     # output: 
     #   rot.* 
     
     cd $1 
-    cp $home/$3 .
-    cp $home/$4 .
+    # cp $home/$3 .
+    # cp $home/$4 .
     awk '{print $1}' $2 > list.dat 
     testfile=$(head -n 1 list.dat)
     NAtoms=$(head -n 1 $testfile)
     jobL=$(( $NAtoms + 2 ))
 
+    rm -f rmsd.dat 
     for name in `cat list.dat`
     do 
         # 1. extract TSS from one trajectory
@@ -270,21 +288,22 @@ function adjustTraj(){
             iniL=$(( 1 + $jobL * ($order -1) ))
             finL=$(( $jobL * $order ))
             sed -n "$iniL,$finL p" $4 > tss.PES.xyz
-            $rotProg tss.$name tss.PES.xyz $name | tee -a rmsd.dat # output: rot.$name, rmsd.dat 
+            $rotProg tss.$name tss.PES.xyz $name >> rmsd.dat
+            # | tee -a rmsd.dat # output: rot.$name, rmsd.dat 
     done 
     # Calculate the average of RMSD before/after rotation and translation
-    njobs=$(wc -l rmsd.dat | awk '{print $1}')
+    njobs=$( wc -l rmsd.dat | awk '{print $1}' )
     avg_rmsd_before=0.0
     avg_rmsd_after=0.0
     for ((i=1;i<=$njobs;i++))
     do 
-        rmsd_before=$(sed -n "$i,$i p" rmsd.dat | awk '{print $1}')
-        rmsd_after=$(sed -n "$i,$i p" rmsd.dat | awk '{print $2}')
-        avg_rmsd_before=$( echo " $rmsd_before + $avg_rmsd_before" | bc)
-        avg_rmsd_after=$( echo " $rmsd_after + $avg_rmsd_after" | bc)
+        rmsd_before=$( sed -n "$i,$i p" rmsd.dat | awk '{print $1}' )
+        rmsd_after=$( sed -n "$i,$i p" rmsd.dat | awk '{print $2}' )
+        avg_rmsd_before=$( echo " $rmsd_before + $avg_rmsd_before " | bc )
+        avg_rmsd_after=$( echo " $rmsd_after + $avg_rmsd_after " | bc )
     done
-    avg_rmsd_before=$( echo "scale=6; $avg_rmsd_before / $njobs " | bc)
-    avg_rmsd_after=$( echo " scale=6; $avg_rmsd_after  / $njobs " | bc)
+    avg_rmsd_before=$( echo " scale=6; $avg_rmsd_before / $njobs " | bc )
+    avg_rmsd_after=$(  echo " scale=6; $avg_rmsd_after  / $njobs " | bc )
     rm -f tss.* list.dat tss.PES.xyz rmsd.dat
 }
 
@@ -300,9 +319,8 @@ function mapTraj(){
 
     EngList=$3
     StrucList=$4
-
-    cd $home 
-    cp $2 $3 $4 $1
+    cp $home/$2 $home/$3 $home/$4 $1
+    
     cd $1 
 
     # 1. Extract correct name list for trajectories 
@@ -317,12 +335,36 @@ function mapTraj(){
         ForwardTraj=$(sed -n "$i,$i p" List.dat | awk '{print $3}')
         $mapProg $name $EngList $StrucList $ReverseTraj $ForwardTraj # output: coord.$name
     done
-    # rm -f List.dat 
+    rm -f List.dat $2 $3 $4
+}
+
+function reorderTraj(){
+    # Input: 
+    # $1 = $totTraj; input dir.
+    # $2 = $home/AnalysedTraj.dat; output dir. 
+    
+    # reorder trajectories which unifiy to start from reactant 
+    
+    cd $1
+
+    awk '{print $1}' $2 > nameList.dat 
+    i=0
+    for name in `cat nameList.dat`
+    do 
+        i=$(($i+1))
+        half1=$(sed -n "$i,$i p" $2 | awk '{print $2}') # R or P1/P2
+        half2=$(sed -n "$i,$i p" $2 | awk '{print $3}') # R or P1/P2
+        if [ "$half2" == 'R' ]; then 
+            sed '1!G;h;$!d' coord.rot.$name > tmp 
+            mv tmp coord.rot.$name 
+        fi
+    done
+    rm -f nameList.dat 
 }
 
 function moveTraj(){
     # Input: 
-    #   $1 = AnalysedTraj.dat 
+    #   $1 = $home/AnalysedTraj.dat 
     #   $2 = $totTraj 
     #   $3 = $RP1dir 
     #   $4 = $RP2dir 
@@ -344,6 +386,31 @@ function moveTraj(){
     done
 
     rm -f RP1list.dat RP2list.dat 
+}
+
+
+function splitCoord(){
+    # Input: 
+    #   $1 = $workdir = $RP1dir or $RP2dir 
+    #   $2 = ${intervalT[@]}
+    workdir=$1 
+    shift # shift the second input arg. to the first one
+
+    namedir=$(echo $workdir | rev | cut -d '/' -f 1 | rev)
+    for intTime in `echo "$@" `
+    do 
+        cd  $home 
+        rm -rf $namedir.$intTime\fs
+        mkdir $namedir.$intTime\fs
+
+        cd $workdir 
+        ls | grep coord > list.dat 
+        for name in `cat list.dat `
+        do 
+            head -n $intTime $name > ../$namedir.$intTime\fs/$name
+        done 
+        rm -f list.dat 
+    done
 }
 
 main $1 $2 $3 $4 $5

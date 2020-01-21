@@ -29,29 +29,33 @@ from mpl_toolkits.mplot3d import Axes3D
 # from itertools import cycle
 
 workDir = os.getcwd()
-PATH_RP1 = workDir + '/RP1.coord/'
-PATH_RP2 = workDir + '/RP2.coord/'
+RP1dir='RP1.coord'
+RP2dir='RP2.coord'
+PATH_RP1 = workDir + '/' + RP1dir + '/'
+PATH_RP2 = workDir + '/' + RP2dir + '/'
 
 PATH_fig = workDir
 # title = '61*61=3721 pts'
 title = ''
-xaxis = "IRC of TSS1 ($\sqrt{amu}\cdot$Bohr)"
-yaxis = "IRC of TSS2 ($\sqrt{amu}\cdot$Bohr)"
+# xaxis = "Modified IRC of TSS1 ($\sqrt{amu}\cdot$Bohr)"
+xaxis=''
+# yaxis = "IRC of TSS2 ($\sqrt{amu}\cdot$Bohr)"
+yaxis=''
 zaxis = 'kcal/mol'
-plt.rcParams.update({'font.size': 14})
-
+# plt.rcParams.update({'font.size': 14})
+axis_fontsize = 12
 
 def main():
     # 1. Input
     X, Y, E, pts_name, pts_coord = getInput()
 
     # 2. plot 2D PES with important points
-    twoDwPts(X, Y, E, pts_name, pts_coord)
-    # VRIregion(X, Y, E, pts_name, pts_coord)
+    # twoDwPts(X, Y, E, pts_name, pts_coord)
+    VRIregion(X, Y, E, pts_name, pts_coord)
 
     # 3. plot 2D PES with mapping trajectories
-    # twoDwTraj(X, Y, E, PATH_RP1, 'r-')  # red trajectories
-    # twoDwTraj(X, Y, E, PATH_RP2, 'b-')  # blue trajectories
+    # twoDwTraj(X, Y, E, PATH_RP1, '-r', RP1dir)  # red trajectories
+    # twoDwTraj(X, Y, E, PATH_RP2, '-b', RP2dir)  # blue trajectories
 
     # 4. plot 3D PES with important points
     # threeDwPts(X, Y, E, pts_name, pts_coord)
@@ -77,7 +81,7 @@ def totTraj(PATH):
 
 def getInput():
     # import PES w/ x, y and z coord
-    # TODO: change square to recentagular
+    # FIXME: change square to recentagular
     tline = totline(str(sys.argv[1]))
     dim = int(math.sqrt(tline))
     x, y, e = np.loadtxt(str(sys.argv[1]), delimiter=' ', unpack=True)
@@ -139,8 +143,8 @@ def twoDwPts(X, Y, E, pts_name, pts_coord):
     ct = plt.contour(X, Y, relE, 20, colors='k')
     plt.clabel(ct, inline=1, fmt='%1.0f', fontsize=8)  # value of contour
     plt.title(title)
-    plt.xlabel(xaxis)
-    plt.ylabel(yaxis)
+    plt.xlabel(xaxis,fontsize=axis_fontsize)
+    plt.ylabel(yaxis,fontsize=axis_fontsize)
     # plt.xticks([0.47, 0.97, 1.47])
     # plt.yticks([98, 108, 118])
 
@@ -162,12 +166,15 @@ def twoDwPts(X, Y, E, pts_name, pts_coord):
 
     # label the VRI region within a red box
     VRIheight = [3,6,3,3,6]
+    # TODO:
     m = 5 # 1 = NCH1, 2 = NCH2, 3 = NCH3, 4 = NCH4 and 5 = NCH5
     plt.plot( [ pts_coord[1][0], pts_coord[1][0] ], [ -VRIheight[m-1],  VRIheight[m-1] ], '-r')
     plt.plot( [ pts_coord[1][0], pts_coord[2][0] ], [  VRIheight[m-1],  VRIheight[m-1] ], '-r')
     plt.plot( [ pts_coord[2][0], pts_coord[2][0] ], [ -VRIheight[m-1],  VRIheight[m-1] ], '-r')
     plt.plot( [ pts_coord[1][0], pts_coord[2][0] ], [ -VRIheight[m-1], -VRIheight[m-1] ], '-r')
 
+    fig.set_size_inches(5,7.5)
+    fig.tight_layout()
     fig = plt.show()
     plt.close(fig)
 
@@ -181,16 +188,22 @@ def VRIregion(X, Y, E, pts_name, pts_coord):
     for i in range(dim):
         for j in range(dim):
             relE[i][j] = (E[i][j] - E_R) * 627.5095
-
+            
+    print(E_R)
     fig = plt.figure()
     ax = plt.gca()  # .set_aspect('equal')
     ax.set_aspect('equal')  # aspect ratio of x and y is equal
+    
     # set x and y limit
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     ax.set_xlim((pts_coord[1][0], pts_coord[2][0]))
-    ax.set_ylim((-3, 3))
 
+    # TODO:
+    m = 4 # 1 = NCH1, 2 = NCH2, 3 = NCH3, 4 = NCH4 and 5 = NCH5
+    yrange = ( [-3, 3],[-6,6],[-3, 3],[-3, 3],[-6,6] )
+    ax.set_ylim((yrange[m-1][0],yrange[m-1][1]))
+   
     vmin = 50
     vmax = 120
     vint = 8
@@ -199,8 +212,8 @@ def VRIregion(X, Y, E, pts_name, pts_coord):
         vmin, vmax, vint), cmap="RdBu_r")
 
     plt.title(title)
-    plt.xlabel(xaxis)
-    plt.ylabel(yaxis)
+    plt.xlabel(xaxis,fontsize=axis_fontsize)
+    plt.ylabel(yaxis,fontsize=axis_fontsize)
 
     # plot important points
     npts = totline(str(sys.argv[2]))
@@ -208,16 +221,18 @@ def VRIregion(X, Y, E, pts_name, pts_coord):
     shift_y = [0.1, 0.5, 0.5, 0.1, -0.1]
     for n in range(npts):
         plt.plot(pts_coord[n][0], pts_coord[n][1], 'ro')
-        plt.text(pts_coord[n][0]+shift_x[n], pts_coord[n][1]+shift_y[n],
+        plt.text(pts_coord[n][0] + shift_x[n], pts_coord[n][1] + shift_y[n],
                  pts_name[n], weight='bold', backgroundcolor='white', verticalalignment='top', multialignment='right', fontsize=12)
     # order of savefig() and show() is important
     # fig.savefig(PATH_fig + '2DwPts.png', dpi=100)
-    plt.colorbar()
+    fig.set_size_inches(5,7.5)
+    fig.tight_layout()
+    # plt.colorbar() #TODO:
     plt.show()
     plt.close(fig)
 
 
-def twoDwTraj(X, Y, E, PATH, color):
+def twoDwTraj(X, Y, E, PATH, color,dirname):
     mpl.rcParams['contour.negative_linestyle'] = 'solid'
     fig = plt.figure()
     plt.gca().set_aspect('equal')  # aspect ratio of x and y is equal
@@ -226,6 +241,9 @@ def twoDwTraj(X, Y, E, PATH, color):
     plt.title(title)
     plt.xlabel(xaxis)
     plt.ylabel(yaxis)
+    # remove the indices on axis
+    # plt.xticks([])
+    # plt.yticks([])
 
     # Plot trajectories
     numRP, nameTraj = totTraj(PATH)
@@ -234,7 +252,11 @@ def twoDwTraj(X, Y, E, PATH, color):
         traj_X, traj_Y, traj_E = getTraj(PATH, nameTraj[i])
         plt.plot(traj_X, traj_Y, color)
 
-    # fig.savefig(PATH_fig + '2DwTraj.png', dpi=100)
+    fig.set_size_inches(5,7.5)
+    # remove the blank part 
+    fig.tight_layout()
+    # plt.subplots_adjust(hspace=0,wspace=0)
+    fig.savefig(PATH_fig + dirname + '.png', dpi=100)
     fig = plt.show()
     plt.close(fig)
 

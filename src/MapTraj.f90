@@ -1238,13 +1238,12 @@ subroutine coordHalfTraj(NAtoms,numPts,PESList,tss_index,cstr,inputFile,outputFi
             ! cstr = constraint for reverse/forward directions; defR.dat or defP$n.dat
             call step2_select1fromNeighbors(NAtoms,numPts,oneStruc,cstr,inIndex,outIndex)
             
-            ! Tune the coordinate in both x and y directions
-            call tuneTraj(NAtoms,numPts,PESList,oneStruc,outIndex,tune_coord)
+            ! Tune the coordinate in both x and y directions FIXME:
+            ! call tuneTraj(NAtoms,numPts,PESList,oneStruc,outIndex,tune_coord)
 
             inIndex = outIndex 
-            ! write(20,"(3(F15.8,1X))") PESList(outIndex,1:3) ! turn-off tuneTraj2()
-            write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
-            ! write(*,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
+            write(20,"(3(F15.8,1X))") PESList(outIndex,1:3) ! turn-off tuneTraj()
+            ! write(20,"(3(F15.8,1X))") tune_coord(1:2),PESList(outIndex,3)
             ! write(*,'(A)') '---------------------------'
         end do 
         close(10)

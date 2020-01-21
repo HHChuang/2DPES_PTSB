@@ -424,7 +424,7 @@ FIXME: integrate all the source code into findCoord.sh, MapTraj.f90, CountProd.f
 
 <!-- This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details -->
 
-## Acknowledgments
+<!-- ## Acknowledgments
 
 * Thanks for the MOST exchange project, 107-2917-I-002-004. 
-
+ -->
