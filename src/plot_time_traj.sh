@@ -4,6 +4,7 @@
 dir1='RP1.coord'
 dir2='RP2.coord'
 home=`pwd`
+sysIndex=$1
 
 # maximum limit of x-range
 xmaxList=(3.1 6.5 2.8 3.2 6.1) 
@@ -16,50 +17,43 @@ function main {
     rm -rf mix
     mkdir mix
 
-    echo $dir1
-    makelist $dir1 mix $1
-    echo $dir2
-    makelist $dir2 mix $1 
-    
-     
+    makelist $dir1 mix # output: $dir1.list
+    makelist $dir2 mix 
+        
+    # plot traj.
     cd $home/mix 
     RP1list=( $(cat RP1.coord.list) )
     RP2list=( $(cat RP2.coord.list) )
-    plot_time_traj $1 
+    plot_time_traj $sysIndex
 
-    # 
-    mv RP1.eps NCH$1.RP1.eps 
-    mv RP2.eps NCH$1.RP2.eps 
-    mv RP1RP2.eps NCH$1.RP1RP2.eps 
+    # calculate avgTime and SD
+    # echo $dir1
+    # calcStatistic $dir1.list 
+    # echo $dir2
+    # calcStatistic $dir2.list
+
+    # collect figures
+    mv RP1.eps NCH$sysIndex.RP1.eps 
+    mv RP2.eps NCH$sysIndex.RP2.eps 
+    mv RP1RP2.eps NCH$sysIndex.RP1RP2.eps 
     mv $home/mix/*.eps $home 
 }
 
 function makelist {
     # $1 = name of dir.
     # $2 = final dir.
-    # $3 = indes of selected system
     # output: $1.list 
 
     cd $home/$1
     ls | grep coord > list 
-    nTraj=$(wc -l list | awk '{print $1}')
-    sumTraj=0
     for name in `cat list`
     do  
         TSS1toTSS2 $name # output: TSS1toTSS2$name
         nl TSS1toTSS2$name | awk '{print $2,$1}' > new.$name
-        #
-        countGreenT $3 new.$name # output: $singleTraj
-        # echo 'new'.$name $singleTraj
-        sumTraj=$(( $sumTraj + $singleTraj))
     done 
-    # TODO:
     awk '{print "new."$1}' list > $1.list 
-    avgTraj=$(echo "$sumTraj/$nTraj" | bc -l )
-    echo $nTraj $avgTraj 
 
     rm -f list TSS1toTSS2*
-
     mv new.* $home/$2 
     mv $1.list $home/$2 
 }
@@ -70,7 +64,7 @@ function countGreenT {
     # output: 
     # modify the value of $singleTraj
 
-    index=$(( $1 - 1 ))
+    index=$(( $sysIndex - 1 ))
     objini=${objiniList[$index]}
     objfin=${objfinList[$index]}
 
@@ -118,6 +112,7 @@ function plot_time_traj {
     xmax=${xmaxList[$index]}
     objini=${objiniList[$index]}
     objfin=${objfinList[$index]}
+    objmid=$(echo "($objini + $objfin)/2.0" | bc -l )
 
 gnuplot << EOF
 # postscript does't support transparent
@@ -133,10 +128,11 @@ set size square
 set xrange [0:$xmax]
 # set yrange [20:200]
 set yrange [0:100]
-set ylabel 'fs'
+set ylabel 'Time (fs)'
 set xlabel 'TSS1 {/Symbol \256} TSS2 ({/Symbol @{\140\140\140}\326}amu Bohr)'
 set style rect fillcolor rgb "seagreen" fill transparent solid 0.5 noborder  
 set obj rect from $objini, graph 0 to $objfin, graph 1 #front
+set x2tics ("TSS1" 0, "VRI" $objmid, "TSS2" $xmax)
 
 plot for [file in RP1list] file u 1:2 w line lw 3 lc rgb 'red'
 
@@ -149,4 +145,35 @@ plot for [file in RP1list] file u 1:2 w line lw 3 lc rgb 'red', \
 EOF
 }
 
-main $1
+function calcStatistic {
+    # $1 = name of list 
+    # output (std-out): 
+    # $avgTime; average time 
+    # $SD; standard deviation
+
+    nTraj=$(wc -l $1 | awk '{print $1}')
+    sumTraj=0
+    timeTraj=()
+    timeind=0
+    for name in `cat $1`
+    do 
+        countGreenT $sysIndex $name # output: $singleTraj
+        timeTraj[$timeind]=$singleTraj
+        timeind=$(( $timeind + 1 ))
+        # echo $name $singleTraj
+        sumTraj=$(( $sumTraj + $singleTraj))
+    done 
+    avgTraj=$(echo "$sumTraj/$nTraj" | bc -l )
+    # echo ${timeTraj[@]}
+
+    SD=0
+    for ((i=0;i<$nTraj;i++))
+    do 
+        SD=$(echo "( ${timeTraj[$i]}*1.0 - $avgTraj )^2 + $SD" | bc -l)
+    done 
+    SD=$( echo "sqrt( $SD / ($nTraj-1) )"|bc -l )
+
+    echo '$nTraj $avgTime $SD'
+    printf "%d\t %.2f\t %.2f \n" $nTraj $avgTraj $SD
+}
+main 

@@ -3,15 +3,8 @@
 ## Table of Content
 - [**2D-PES of Reaction with PTSB**](#2d-pes-of-reaction-with-ptsb)
   - [Table of Content](#table-of-content)
-  - [- Acknowledgments](#acknowledgments)
-- [**Introduction of PTSB**](#introduction-of-ptsb)
-  - [What I know](#what-i-know)
-  - [My strategies](#my-strategies)
-  - [PTSB systems](#ptsb-systems)
-- [**Getting Start**](#getting-start)
-  - [1. Analytical 2D-PES practices](#1-analytical-2d-pes-practices)
-  - [2. Numerical 2D-PES with the projection of quasi-classical dynamic trajectories](#2-numerical-2d-pes-with-the-projection-of-quasi-classical-dynamic-trajectories)
-    - [Step 1: Calculate normal IRC paths](#step-1-calculate-normal-irc-paths)
+- [**Numerical 2D-PES of the reactions with PTSB**](#numerical-2d-pes-of-the-reactions-with-ptsb)
+    - [Step 1: Calculate normal IRPs](#step-1-calculate-normal-irps)
     - [Step 2: Asymmetric cases: generate artificial reaction coordinate](#step-2-asymmetric-cases-generate-artificial-reaction-coordinate)
     - [Step 3: Construct x- and y-axes (optional)](#step-3-construct-x--and-y-axes-optional)
       - [*Symmetric cases*](#symmetric-cases)
@@ -19,94 +12,23 @@
     - [Step 4: Select 1D grid points for all IRC paths](#step-4-select-1d-grid-points-for-all-irc-paths)
     - [Step 5: Scan a 2D-PES](#step-5-scan-a-2d-pes)
     - [Step 6: Project dynamic trajectories on this 2D-PES.](#step-6-project-dynamic-trajectories-on-this-2d-pes)
+- [**Mapping of BOMD trajectories**](#mapping-of-bomd-trajectories)
   - [Authors](#authors)
-  - [Acknowledgments](#acknowledgments)
----
-# **Introduction of PTSB** 
-## What I know 
-1. Some products' ratio cannot be explained by a single-step mechanism (cf. [Chemical Science, 2016, 00, 1-3][ref1])
-2. Selectivity of chemical reaction is dominant by dynamic effect in post-transition-state bifurcation (PTSB). (cf.[ Nature Chemistry, 2014, 6, 104-111.][ref2])
-3. Traditional IRC cannot describe PTSB.
-4. Most PTSBs calculate AIMD trajectories to interpret dynamic effect.  
-5. From organic chemists point of view, potential energy surface (PES) is a tool to give a reasonable chemical picture. 
-6. Full PES is a NP problem. 
 
-## My strategies
-1. Select two important degrees-of-freedom in multi-dimensional space to build a 2D-PES.
-   - Combine the normal coordinate and 'local mode picture'. 
-      -  Analysis the reaction path from TSS1 to P1, and then construct the reaction coordinate from VRI region to TSS2.
-        <!-- - FIXME: this part should be rewrite -->
-   - Using the character of VRI for asymmetric case (cf. [International Journal of Quantum Chemistry 2015, 115, 258-269][ref3]). 
-     - VRI: its zero eigenvalue is orthogonal to the gradient 
-    
-1. If 2D-PES cannot be built, then build the leading reaction pathways. 
-
-[ref1]: http://pubs.rsc.org/en/Content/ArticleLanding/2017/SC/C6SC03745C#!divAbstract
-[ref2]: https://www.nature.com/articles/nchem.1843
-
----
-
-## PTSB systems
-1. Symmetry cases: 
-   1. CH3O isomerization ([International Journal of Quantum Chemistry 2015, 115, 258-269][ref3])
-   2. C2H4 + HX, X=F,Cl and Br.
-   
-   <!-- PATH: /aux/TestSystem/symmetricPES/CH3O -->
-2. Asymmetry cases: 
-    1. CH2O + CH3Cl ([International Journal of Quantum Chemistry 2015, 115, 258-269][ref3])
-    2. HCN ([Theoretical Chemistry Accounts 2004, 112, 40-51][ref4])
-    
-
-[ref3]: https://onlinelibrary.wiley.com/doi/abs/10.1002/qua.24757
-[ref4]: https://link.springer.com/article/10.1007%2Fs00214-003-0558-8
-[ref5]: https://pubs.acs.org/doi/abs/10.1021/jacs.7b01042
-
-<!-- ## Systems have AIMD results #
-1. Abietadiene?
-   <div style='float: center'>
-        <img style='width: 200px' src="./aux/Fig/Abietadiene.png"></img>
-    </div> 
-2. Rh project (cf. [Chemical Science, 2016, 00, 1-3][ref1])
-     <div style='float: center'>
-        <img style='width: 200px' src="./aux/Fig/Rh.png"></img>
-    </div> 
-3. Ring opening (from Stephanie R.Hare)
-   <div style='float: center'>
-        <img style='width: 200px' src="./aux/Fig/Ring.png"></img>
-    </div>  -->
-
----
-
-# **Getting Start**
-
-## 1. Analytical 2D-PES practices
-- Goals
-    1. Practice how IRC work
-    2. Search the bifurcated pathways
-- Search the bifurcated pathways
-  - Running steepest decent path from different starting points (VRI point and the points nearby). If the gradient becomes zero, it will switch to the direction of the Hessian eigenvector with a negative eigenvalue.
-
-   <div style='float: center'>
-        <img style='width: 500px' src="./aux/Fig/IRC.png"></img>
-    </div> 
-- Searching the first order saddle point.
-    <div style='float: center'>
-        <img style='width: 500px' src="./aux/Fig/FindingTS2.png"></img>
-    </div> 
-
-## 2. Numerical 2D-PES with the projection of quasi-classical dynamic trajectories
+# **Numerical 2D-PES of the reactions with PTSB**
 
 - **Overview all processes**
-    1. Calculate normal IRC paths
-    2. Asymmetric cases: generate artificial reaction coordinate
-    3. Construct x- and y-axes (optional)
+    1. Distinguish PTSBs: symmetric or asymmetric 
+    2. Calculate normal IRC paths
+    3. Asymmetric cases: generate artificial reaction coordinate
+    4. Construct x- and y-axes (optional)
        1. Symmetric cases
        2. Asymmetric cases 
-    4. Select 1D grid points for all IRC paths
-    5. Scan a 2D-PES 
-    6. Project dynamic trajectories on this 2D-PES 
+    5. Select 1D grid points for all IRC paths
+    6. Scan a 2D-PES 
+    7. Project dynamic trajectories on this 2D-PES 
 
-### Step 1: Calculate normal IRC paths
+### Step 1: Calculate normal IRPs
 - Working directory:
   - remote: run/$(system name)/OPT
 - Code: 
@@ -378,7 +300,9 @@ FIXME: integrate all the source code into findCoord.sh, MapTraj.f90, CountProd.f
       - Standard output the statistic report in the end.
         <div style='float: center'>
             <img style='width: 400px' src="./aux/Fig/manyTraj2.png"></img>
-        </div> 
+        </div> -->
+        
+# **Mapping of BOMD trajectories**
 4. Map trajectories on this 2D-PES; 1. rotate trajectories and 2. search  their corresponding coordinates. 
     - In the end, we will have those output directories: 
       - /RP1.reorder.rot
@@ -415,7 +339,7 @@ FIXME: integrate all the source code into findCoord.sh, MapTraj.f90, CountProd.f
 5. Plot 2D and 3D figures with the projection of trajectories; execute step 1, 3 and 5 in `plotPESandTraj.py`, which is *line 215* , *line 221* and *line 227*. 
     <div style='float: center'>
         <img style='width: 300px' src="./aux/Fig/plotPESwTraj.png"></img>
-    </div>  -->
+    </div>  
 
 ## Authors
 
