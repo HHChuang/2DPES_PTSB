@@ -1,38 +1,31 @@
-# **2D-PES of Reaction with PTSB**
+# **Numerical 2D-PES of Reactions with PTSB**
+
+* Using several programs/scripts to general a numerical two-dimensional potential energy surface (2D-PES) of reaction with post-transition-state bifurcation (PTSB).
+* Supporting information of [Construction of Two-Dimensional Potential Energy Surfaces of Reactions with Post-Transition-State Bifurcations.][1]
+* **Author** : Hsiao-Han (Grace) Chuang - *Initial work* - 2018 May.
+  
+[1]: https://pubs.acs.org/doi/10.1021/acs.jctc.0c00172
 
 ## Table of Content
-- [**2D-PES of Reaction with PTSB**](#2d-pes-of-reaction-with-ptsb)
+- [**Numerical 2D-PES of Reactions with PTSB**](#numerical-2d-pes-of-reactions-with-ptsb)
   - [Table of Content](#table-of-content)
-- [**Numerical 2D-PES of the reactions with PTSB**](#numerical-2d-pes-of-the-reactions-with-ptsb)
-    - [Step 1: Calculate normal IRPs](#step-1-calculate-normal-irps)
+  - [Processes to generate 2D-PESs](#processes-to-generate-2d-pess)
+    - [Step 1: Calculate stationary points and IRCs.](#step-1-calculate-stationary-points-and-ircs)
     - [Step 2: Asymmetric cases: generate artificial reaction coordinate](#step-2-asymmetric-cases-generate-artificial-reaction-coordinate)
     - [Step 3: Construct x- and y-axes (optional)](#step-3-construct-x--and-y-axes-optional)
       - [*Symmetric cases*](#symmetric-cases)
       - [*Asymmetric cases*](#asymmetric-cases)
     - [Step 4: Select 1D grid points for all IRC paths](#step-4-select-1d-grid-points-for-all-irc-paths)
     - [Step 5: Scan a 2D-PES](#step-5-scan-a-2d-pes)
-    - [Step 6: Project dynamic trajectories on this 2D-PES.](#step-6-project-dynamic-trajectories-on-this-2d-pes)
-- [**Mapping of BOMD trajectories**](#mapping-of-bomd-trajectories)
-  - [Authors](#authors)
+    - [Step 6: Plot 2D/3D figures](#step-6-plot-2d3d-figures)
 
-# **Numerical 2D-PES of the reactions with PTSB**
+## Processes to generate 2D-PESs
 
-- **Overview all processes**
-    1. Distinguish PTSBs: symmetric or asymmetric 
-    2. Calculate normal IRC paths
-    3. Asymmetric cases: generate artificial reaction coordinate
-    4. Construct x- and y-axes (optional)
-       1. Symmetric cases
-       2. Asymmetric cases 
-    5. Select 1D grid points for all IRC paths
-    6. Scan a 2D-PES 
-    7. Project dynamic trajectories on this 2D-PES 
 
-### Step 1: Calculate normal IRPs
-- Working directory:
-  - remote: run/$(system name)/OPT
+### Step 1: Calculate stationary points and IRCs.
 - Code: 
-    - `checkGau`, `run.sh`
+    - `checkGau`, `runIRC.sh` 
+    <!-- - FIXME: check runIRC.sh and checkGau -->
 1. Quickly run the standard procedure; guess the TSS between two minimums. 
    -  Use `checkGau` to check all important info. from gaussian output files. 
         <div style='float: center'>
@@ -43,16 +36,15 @@
    2. double check the atomic index and order for all systems are consistent
       - check the order of atoms between TS1 and TS2 systems. Reorder them via gaussview if they are different. 
 3. Gain enough grid points of an IRC path
-   1. use the homemade script `run.sh` to test different combinations 
+   1. use the homemade script `runIRC.sh` to test different combinations 
    2. the direction of IRC path in the output files may be wrong, thus the name of output file may need to be modified manually. 
 4. Double check the orientation for all systems.
     - Use *gaussview* or *jmol* to check the molecular orientation.
+    - Show axes is easier to check.
     
 ### Step 2: Asymmetric cases: generate artificial reaction coordinate
 *For asymmetric cases, build the artificial reaction coordinate in the TSS1 forward direction.* 
 
-- Working directory:
-    - remote: run/$(system name)/Artic1D
 - Code: 
     - `runArticIRC.sh`, `genArticStruc.f90` 
 - Input:
@@ -60,10 +52,10 @@
 - Output: 
   - Artic1D.xyz, Artic1D_PEC.dat
   
-1. Compare the energy difference between TS1 and TS2:
-    1. TS1 > TS2
+1. Compare the energy difference between TSS1 and TSS2:
+    1. TSS1 > TSS2
         - go to the following steps.
-    2. TS1 < TS2 and the energy difference is small 
+    2. TSS1 < TSS2 and the energy difference is small 
        - beyond this project, talk to Grace : ) 
 2. Select a point from TSS1 IRC forward direction.
    - near the shoulder of its energy profile.
@@ -76,14 +68,10 @@
 ### Step 3: Construct x- and y-axes (optional) 
 *The following steps is part of the detail in the macro script, `run1Dgrid.sh`. Step 3 can be skipped if using above script, or, if something wrong that this step can be a reference to debug.*
 
-- Working directory:
-  - remote: run/$(system name)/1D
 - Code: 
     - `getIRCcurve`, `getIRCstruc`, `rev1Dstruc`,`checkGau`,`getCoord`
 
 #### *Symmetric cases*
-- Input:
-  - TS1_F/R.log, TS2_F/R.log
 - Output:
   - x.xyz, y_F.xyz, y_R.xyz 
 1. Copy 4 IRC output files from /OPT to /1D as the input files for the following steps.
@@ -119,8 +107,6 @@
 
 ### Step 4: Select 1D grid points for all IRC paths
 
-- Working directory:
-  - remote: run/$(system name)/1D
 - Code: `run1Dgrid.sh`, `get1Dgrid.sh`
   - `run1Dgrid.sh`: `getIRCcurve`, `getIRCstruc`, `selectIRCstruc.sh`, `writeGauInpV`
   - `get1Dgrid.sh`: `checkGau`, `rev1Dstruc`, `rot.py`
@@ -162,8 +148,6 @@
      - x.xyz = R $\to$ TSS1 $\to$ selected point $\to$ TSS2.
 
 ### Step 5: Scan a 2D-PES
-- Working directory:
-  - remote: run/$(system name)/2DPES
 - Code: 
     - Generate numerical 2D-PES
       - `getIRCvec`, `Vsca1D_IRCvec.f90`, `writeGauInpV`, `qsubGau`
@@ -233,122 +217,8 @@
       - Modify the range of *ds* in `GenGradStruc.f90`.
     - Follow the original processes to calculate those potentials. 
 
-### Step 6: Project dynamic trajectories on this 2D-PES.
-FIXME: integrate all the source code into findCoord.sh, MapTraj.f90, CountProd.f90 and rot.py and plotPESandTraj.py - execute them on remote, copy result to local for visualize purpose. 
-
-<!-- - PATH 
-  - Working directory:
-    - remote: run/$(system name)/Traj
-  - ProgDyn source code and relative script: 
-    - remote: 
-- Code: 
-    - Calculate trajectories (call *ProgDyn*) and collect rawdata: 
-      - `submitTraj.sh`, `collectTraj.sh`, `manyTraj.sh`, `CountProd.f90`
-    - Map trajectories:
-      - `adjustTraj.sh`, `rot.py`, `findCoord.sh`, `MapTraj.f90`
-    - Plot potential energy surface with trajectories:
-      - `plot2DPES.py`
-- Workflow: 
-  - Remote:
-    - /ProgRaw $\to$ /DoneTraj $\to$ /totTraj $\to$ /RP1.reorder and /RP2.reorder
-      - /ProgRaw: rawdata for executing *ProgDyn*
-      - /DoneTraj: directories with successful trajectories
-      - /totTraj: collect all successful trajectories in this directory
-      - /RP$n.reorder: classify trajectories into 2 groups
-  - Local:
-    - /RP$n.reorder $\to$ /RP$n.reorder.rot $\to$ /RP$n.reorder.rot.coord
-      - /RP$n.reorder.rot: TODO:
-      - /RP$n.reorder.rot.coord: TODO: 
-
-1. Calculate dynamic trajectories from the program, *ProgDyn* (author: D.A. Singleton), in /ProgRaw.
-   - Prepare input files for *ProgDyn*.
-     - *.log: or called it as freqinHP; gaussian output file.
-     - job: configuration for scheduling system. 
-     - progdyn.conf: configuration for electronic structure calculation.
-     - proganal: criteria to stop dynamic calculation.
-   - Execute script `submitTraj.sh` to replicate /template directory to several copies, /n$i, $i=1,2,3..., and then submit them automatically.
-     - Double check the PATH in this script, which are *line 9* to *line 11*.
-     - Change the amount of duplicate files by modify the variable, $finalfile, which is *line 13*. 
-        <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/submitTraj.png"></img>
-        </div> 
-      - Check the function *main()* for this process, which uncomment step 1 and 2; *line 107* and *line 109* to *line 111*.
-        <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/submitTraj1.png"></img>
-        </div> 
-2. Collect successful trajectories and re-calclulate fail trajectories; step 3 to 5 in `submitTraj.sh`, in /ProgRaw and /DoneTraj.
-   - Execute script `submitTraj.sh` again to classify trajectories into successful and fail categories.
-     - Move successful trajectories to directory /DoneTraj.
-     - Resubmit fail directories in /ProgRaw. Sometimes, this step may needs to iterate several times until get the enough amount of trajectories. For example, one wants more than 100 trajectories.
-        <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/submit.png"></img>
-        </div> 
-3. Collect trajectories rawdata, and then group them into two groups.
-   - Execute `collectTraj.sh` to collect trajectories from /DoneTraj to /totTraj.
-        <div style='float: center'>
-            <img style='width: 400px' src="./aux/Fig/collectTraj.png"></img>
-        </div> 
-   - In /totTraj, execute `manyTraj.sh` to call `CountProd.f90`, and then move selected trajectories to /RP1.reorder and /RP2.reorder.
-      - Prepare the following input files for `manyTraj.sh`
-        - defR.dat: criteria for defining reactant.
-        - defProd1.dat and defProd2.dat: criteria for defining product 1 and 2.
-      - Cut the redundant trajectory which is excess on this PES.
-      - List all the detail information while executing this script.
-        <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/manyTraj1.png"></img>
-        </div> 
-      - Standard output the statistic report in the end.
-        <div style='float: center'>
-            <img style='width: 400px' src="./aux/Fig/manyTraj2.png"></img>
-        </div> -->
-        
-# **Mapping of BOMD trajectories**
-4. Map trajectories on this 2D-PES; 1. rotate trajectories and 2. search  their corresponding coordinates. 
-    - In the end, we will have those output directories: 
-      - /RP1.reorder.rot
-      - /RP2.reorder.rot
-      - /RP1.reorder.rot.coord
-      - /RP2.reorder.rot.coord
-    - Copy rawdata from remote to local.
-        ```
-        scp -P #port $USER@$IP:/$REMOTE_PATH /$LOCAL_PATH
-        ```
-      - Because the orientation of trajectory and the structures on 2D-PES are usually different, such that the trajectories are needed to be modified. 
-      - It is easier to manipulate them on local terminal for visualized purpose. Thus, copy directories /RP1.reorder and /RP2.reorder to local terminal.
-   1. Execute `adjustTraj.sh` to call `rot.py`: rotate all the structures of trajectories.
-      - Prepare the following input files:
-        - $(NGrid)_Struc.xyz: all the structures in this 2D-PES.
-        - /RP$n.reorder: trajectories in two groups.
-      - In `adjustTraj.sh`, modify the name of input file which is *line 20*, and the PATH from *line 24* to *line 28*.
-         <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/adjustTraj.png"></img>
-        </div> 
-      - Input directories $\to$ output directories.
-        - /RP1.reorder $\to$ /RP1.reorder.rot 
-        - /RP2.reorder $\to$ /RP2.reorder.rot
-      - While executing, print out the RMSD for each trajectory before/after rotation.
-        <div style='float: center'>
-            <img style='width: 300px' src="./aux/Fig/rot.png"></img>
-        </div> 
-   2. Execute `findCoord.sh` call `MapTraj.f90`: searching the corresponding coordinates of trajectories.  
-      - /RP1.reorder.rot -> /RP1.reorder.rot.coord 
-      - /RP2.reorder.rot -> /RP2.reorder.rot.coord
-         <div style='float: center'>
-            <img style='width: 300px' src="./aux/Fig/findCoord.png"></img>
-        </div> 
+### Step 6: Plot 2D/3D figures  
 5. Plot 2D and 3D figures with the projection of trajectories; execute step 1, 3 and 5 in `plotPESandTraj.py`, which is *line 215* , *line 221* and *line 227*. 
     <div style='float: center'>
         <img style='width: 300px' src="./aux/Fig/plotPESwTraj.png"></img>
     </div>  
-
-## Authors
-
-* Hsiao-Han (Grace) Chuang - *Initial work* - 2018 May to 2019 June. 
-<!-- <!-- ## License -->
-
-<!-- This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details -->
-
-<!-- ## Acknowledgments
-
-* Thanks for the MOST exchange project, 107-2917-I-002-004. 
- -->
