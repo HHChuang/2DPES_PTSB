@@ -1,77 +1,80 @@
 # **Numerical 2D-PES of Reactions with PTSB**
 
+## Table of Content
+- [**Numerical 2D-PES of Reactions with PTSB**](#numerical-2d-pes-of-reactions-with-ptsb)
+  - [Table of Content](#table-of-content)
+  - [Aim and Reference](#aim-and-reference)
+  - [Processes to Generate 2D-PESs](#processes-to-generate-2d-pess)
+    - [Step 1: Calculate Stationary Points and IRCs.](#step-1-calculate-stationary-points-and-ircs)
+    - [Step 2: Asymmetric Cases: Generate Artificial Reaction Coordinate](#step-2-asymmetric-cases-generate-artificial-reaction-coordinate)
+    - [Step 3: Construct X- and Y-Axes (Optional)](#step-3-construct-x--and-y-axes-optional)
+      - [*Symmetric Cases*](#symmetric-cases)
+      - [*Asymmetric Cases*](#asymmetric-cases)
+    - [Step 4: Select 1D Grid Points for All IRC Paths](#step-4-select-1d-grid-points-for-all-irc-paths)
+    - [Step 5: Scan a 2D-PES](#step-5-scan-a-2d-pes)
+
+## Aim and Reference
 * Using several programs/scripts to general a numerical two-dimensional potential energy surface (2D-PES) of reaction with post-transition-state bifurcation (PTSB).
 * Supporting information of [Construction of Two-Dimensional Potential Energy Surfaces of Reactions with Post-Transition-State Bifurcations.][1]
 * **Author** : Hsiao-Han (Grace) Chuang - *Initial work* - 2018 May.
   
 [1]: https://pubs.acs.org/doi/10.1021/acs.jctc.0c00172
 
-## Table of Content
-- [**Numerical 2D-PES of Reactions with PTSB**](#numerical-2d-pes-of-reactions-with-ptsb)
-  - [Table of Content](#table-of-content)
-  - [Processes to generate 2D-PESs](#processes-to-generate-2d-pess)
-    - [Step 1: Calculate stationary points and IRCs.](#step-1-calculate-stationary-points-and-ircs)
-    - [Step 2: Asymmetric cases: generate artificial reaction coordinate](#step-2-asymmetric-cases-generate-artificial-reaction-coordinate)
-    - [Step 3: Construct x- and y-axes (optional)](#step-3-construct-x--and-y-axes-optional)
-      - [*Symmetric cases*](#symmetric-cases)
-      - [*Asymmetric cases*](#asymmetric-cases)
-    - [Step 4: Select 1D grid points for all IRC paths](#step-4-select-1d-grid-points-for-all-irc-paths)
-    - [Step 5: Scan a 2D-PES](#step-5-scan-a-2d-pes)
-    - [Step 6: Plot 2D/3D figures](#step-6-plot-2d3d-figures)
+## Processes to Generate 2D-PESs
 
-## Processes to generate 2D-PESs
+### Step 1: Calculate Stationary Points and IRCs.
+*Optimize two transition-state structures (TSSs), and then run the corresponding IRCs. After that, extract the last points of IRCs as the initial structures for local minima optimization.*
 
-
-### Step 1: Calculate stationary points and IRCs.
 - Code: 
-    - `checkGau`, `runIRC.sh` 
-    <!-- - FIXME: check runIRC.sh and checkGau -->
-1. Quickly run the standard procedure; guess the TSS between two minimums. 
-   -  Use `checkGau` to check all important info. from gaussian output files. 
-        <div style='float: center'>
-            <img style='width: 500px' src="./aux/Fig/checkGau.png"></img>
-        </div> 
-2. Re-run the whole process again, because 
-   1. double check the accuracy of assigned mechanism
-   2. double check the atomic index and order for all systems are consistent
-      - check the order of atoms between TS1 and TS2 systems. Reorder them via gaussview if they are different. 
+    - `checkGau`, `runIRC` 
+
+1. From organic chemistry, guess possible initial structures of TSSs and then follow the user guide in standard electronic package (i.e., Gaussian 09/16 in this project) to write input files. 
+   - TSSs have one and only one imaginary frequency and the corresponding vibration mode need to fit the guessed reaction mechanisms. 
+   - This try-and-error step needs well-trained organic chemistry background and good chemical intuition.
+   
+2. Double check the consistency of atomic index and ordering for all molecules.
+      - Check the ordering of atoms between TSS1 and TSS2 systems. Reorder them via Gaussview if they are different. 
 3. Gain enough grid points of an IRC path
-   1. use the homemade script `runIRC.sh` to test different combinations 
-   2. the direction of IRC path in the output files may be wrong, thus the name of output file may need to be modified manually. 
+   - Use `runIRC` to test different combinations of keywords in route section.
+   - Check the direction of IRC paths.
 4. Double check the orientation for all systems.
     - Use *gaussview* or *jmol* to check the molecular orientation.
     - Show axes is easier to check.
+5. Use `checkGau` to check all important information from Gaussian output files. 
+    <div style='float: center'>
+        <img style='width: 500px' src="./aux/Fig/checkGau.png"></img>
+    </div> 
     
-### Step 2: Asymmetric cases: generate artificial reaction coordinate
+### Step 2: Asymmetric Cases: Generate Artificial Reaction Coordinate
 *For asymmetric cases, build the artificial reaction coordinate in the TSS1 forward direction.* 
 
 - Code: 
     - `runArticIRC.sh`, `genArticStruc.f90` 
 - Input:
-  - $(selectCoord).log, TS2.log
+  - $(selectCoord).log, TSS2.log
 - Output: 
   - Artic1D.xyz, Artic1D_PEC.dat
   
 1. Compare the energy difference between TSS1 and TSS2:
     1. TSS1 > TSS2
-        - go to the following steps.
+        - Go to the following steps.
     2. TSS1 < TSS2 and the energy difference is small 
-       - beyond this project, talk to Grace : ) 
+       - Beyond this project, this is not a pitchfork model potential.
 2. Select a point from TSS1 IRC forward direction.
-   - near the shoulder of its energy profile.
-   - near the gradient which is close to zero, or has a turn over point.
-3. Execute `runArticIRC.sh` to generate a serious of structures which use program `genArticStruc.f90` to build artificial reaction coordinate. 
+   - Near the shoulder of its energy profile.
+   - Near the gradient which is close to zero, or has a turn over point.
+3. Execute `runArticIRC.sh` to generate a serious of structures which use  `genArticStruc.f90` to build artificial reaction coordinate. 
    - After it fulfills the criteria (i.e. energy difference between the last point and TS2 is less than 0.0001 hartree; less than 1 kcal/mol), the program will stop automatically. 
    - Use `jmol` to check the structures via file *Artic1D.xyz*.
    - Use `gnuplot` to plot energy profile via file *Artic1D_PEC.dat*. 
 
-### Step 3: Construct x- and y-axes (optional) 
-*The following steps is part of the detail in the macro script, `run1Dgrid.sh`. Step 3 can be skipped if using above script, or, if something wrong that this step can be a reference to debug.*
+### Step 3: Construct X- and Y-Axes (Optional) 
+*Combine fragmented files into three files, x.xyz, y_F.xyz and y_R.xyz.*
 
 - Code: 
-    - `getIRCcurve`, `getIRCstruc`, `rev1Dstruc`,`checkGau`,`getCoord`
+    - `getIRCcurve`, `getIRCstruc`, `rev1Dstruc`, `checkGau`, `getCoord`
 
-#### *Symmetric cases*
+#### *Symmetric Cases*
 - Output:
   - x.xyz, y_F.xyz, y_R.xyz 
 1. Copy 4 IRC output files from /OPT to /1D as the input files for the following steps.
@@ -93,7 +96,7 @@
    - y_R.xyz = TSS2 $\to$ P2.
 4.  Check the orientation via *jmol* and then open the axes function; sometimes the TS structure and IRC structures has shift, and cannot properly overlap to each other. 
 
-#### *Asymmetric cases* 
+#### *Asymmetric Cases* 
 - Input:
   - TS1_F.xyz, Artic1D.xyz
 - Output:  
@@ -105,7 +108,8 @@
       - x.xyz = R $\to$ TSS1 $\to$ selected point $\to$ TSS2
 2. Generate y_F.xyz and y_R.xyz: same process as the symmetric case.
 
-### Step 4: Select 1D grid points for all IRC paths
+### Step 4: Select 1D Grid Points for All IRC Paths
+ *To reduce computational cost, select enough grid points in one-dimensional energy profile instead of using full grids.*
 
 - Code: `run1Dgrid.sh`, `get1Dgrid.sh`
   - `run1Dgrid.sh`: `getIRCcurve`, `getIRCstruc`, `selectIRCstruc.sh`, `writeGauInpV`
@@ -133,16 +137,16 @@
 
 1. Execute script `run1Dgrid.sh` to generate selected 1D grid points.
    - If the file, Artic1D.xyz, exists, then it is an asymmetric case. Or, it is a symmetric case. Do not remove it durning the calculation. 
-   - The default amount of selected grid point is 30. If one wants to change it, go to this part of `run1Dgrid.sh`, and then uncomment *line 211* and comment *line 212*. 
+   - The default amount of selected grid point is 30, and it can be modified in *line 212* of `run1Dgrid.sh`. 
         <div style='float: center'>
             <img style='width: 300px' src="./aux/Fig/gridP.png"></img>
         </div> 
-    - This script uses `selectIRCstruc.sh` to select points along the new reaction coordinate in order to reduce the computational cost. 
+    - `selectIRCstruc.sh` selects points along the new reaction coordinate in order to reduce the computational cost. 
         <div style='float: center'>
             <img style='width: 400px' src="./aux/Fig/selectIRCstruc.png"></img>
         <div>
     - Use gnuplot to double check the geometries and the selected geometries. 
-2. Execute script `get1Dgrid` to collect data.
+2. Execute `get1Dgrid` to collect data.
    - Plot the potential energy curves of selected grid points to see if the selected points are reasonable.
    - **Double check the geometries! Really important!** Use gnuplot to check the geometries of x.xyz; it should start from R to TSS2. Recall that, 
      - x.xyz = R $\to$ TSS1 $\to$ selected point $\to$ TSS2.
@@ -151,7 +155,7 @@
 - Code: 
     - Generate numerical 2D-PES
       - `getIRCvec`, `Vsca1D_IRCvec.f90`, `writeGauInpV`, `qsubGau`
-    - Modify the topology 
+    - Constrain optimization
       - `getGrad.sh`, `genGradStruc.f90`, `genNewPES.sh`
     - Collect rawdata 
       - `getPESwStruc.sh`, `checkGau`
@@ -162,7 +166,7 @@
 - Output: 
   - $(Pts)_E.dat, $(Pts)_Struc.xyz
   
-1. Generate numerical 2D-PES 
+1. Generate a numerical 2D-PES 
    1. Create sub-directories and named as *Forward* and *Reverse*, which is the directions along y-axis. 
    2. In /1D directory, rename $(NGrid)_TS2_F.xyz as y_F.xyz, and $(NGrid)_TS2_R.xyz as y_R.xyz. After that, copy x.xyz, y_F.xyz and y_R.xyz from /1D to /2DPES. 
    3. Execute `getIRCvec` to calculate translational vectors from y_F.xyz and y_R.xyz.
@@ -216,9 +220,3 @@
     - Use `genNewPES.sh` to execute `GenGradStruc.f90`, and then generate several new potentials which are named as *G_\*.xyz*.
       - Modify the range of *ds* in `GenGradStruc.f90`.
     - Follow the original processes to calculate those potentials. 
-
-### Step 6: Plot 2D/3D figures  
-5. Plot 2D and 3D figures with the projection of trajectories; execute step 1, 3 and 5 in `plotPESandTraj.py`, which is *line 215* , *line 221* and *line 227*. 
-    <div style='float: center'>
-        <img style='width: 300px' src="./aux/Fig/plotPESwTraj.png"></img>
-    </div>  

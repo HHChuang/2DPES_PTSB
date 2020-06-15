@@ -1,0 +1,47 @@
+#!/bin/bash
+# 2018/08/23, Grace, rewrite
+# $1 = TS.log
+
+function getCoord(){
+    # $1 = TS.log
+    # $2 = 
+    
+    # Gaussian
+    rm -f coord.tmp
+    num=$(grep -w 'NAtoms' $1 | head -n 1 | awk '{print $2}' )
+    grep -A $(($num+4)) 'Input orientation:' $1 | tail -n $num | \
+        awk '{print $2 "\t" $4 "\t" $5 "\t" $6}' > coord.tmp
+    #grep -A $(($num+4)) 'Standard orientation:' $1 | tail -n $num > coord.tmp
+    basis=$(grep 'Standard basis' $1 | tail -n 1 | awk '{print $3}')
+    method=$(grep 'SCF Done:' $1 | tail -n 1 | awk '{print $3}' \
+            | sed 's/E(//g' | sed 's/)//g')
+    charge=$(grep Charge $1 | head -n 1 | awk '{print $3}')
+    multi=$(grep Multiplicity $1 | head -n 1 | awk '{print $6}')
+}
+
+getCoord $1 # output: coord.tmp
+            # global variable: $method, $basis, $charge, $multi
+
+for coord in Internal Cartesian MW
+do
+	for force in CalcFC CalcAll #RCFC
+	do 
+		for stepsize in  5 10
+		do
+			name=$(echo "$coord.$force.$stepsize")
+		#	cp TS_ET.Rot_Cs.chk $name.chk
+#cat << EOF > $name.com
+#%chk=$name.chk
+cat << EOF > $name.com
+# $method/$basis IRC($coord,$force,Stepsize=$stepsize,Forward,maxcycle=500,maxpoints=300) 
+IRC forward
+$charge $multi
+EOF
+    cat coord.tmp >> $name.com
+    echo '' >> $name.com
+			#g09sub $name.com $name.log
+		done
+	done
+done
+
+rm -f coord.tmp
