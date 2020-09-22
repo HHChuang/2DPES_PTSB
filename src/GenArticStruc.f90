@@ -16,6 +16,7 @@
 ! History:                                                                          !
 !   2018/08/11, Grace                                                               !
 !   2019/04/20, Grace,                                                              !
+!   2020/09/10, Grace, add bromine and rhodium in the subroutine ANtoAW.            !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 program main
@@ -26,7 +27,7 @@ program main
         real(8),allocatable,dimension(:,:)  :: iniCoord,finCoord
         real(8),allocatable,dimension(:,:)  :: F,TS2EigV,ModifiedG
         ! from benchmark information ds = 0.001. All in MW unit.
-        real(8),parameter   :: ds = 0.005D0 
+        real(8),parameter   :: ds = 0.5D0 
 
         ! Step 1. Using variable 'NAtoms' to allocate memory
             call GETARG(1,filename)
@@ -161,6 +162,10 @@ subroutine ANtoAW(AN,AW)
         AW=18.998
     case (15) ! phosphorus
         AW=30.974
+    case(35) ! bromine
+        AW=79.904
+    case(45) ! rhodium
+        AW=102.91
     case default
         write(*,'(A)') 'Modified the subroutine "ANtoAW"'
         write(*,'(A)') 'Stop the program, GenArticStruc.f90.'

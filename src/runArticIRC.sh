@@ -16,6 +16,7 @@
 #       reaction coordinate.                                            #
 #   2. TS2.log                                                          #
 #       extract its eigenvector with one negative eigenvalue            #
+#       need freq=hpmodes in the route section                          #
 #                                                                       #
 # Output :                                                              #
 #   1. Artic1D_PEC.dat                                                  #
@@ -66,7 +67,7 @@ function main(){
         E_TS2=$(checkGau $2 | tail -n 1 | awk '{print $2}')
         E_error=0.0001 # 0.0001 hartree ~ less than 1 kcal/mol 
 
-        # for i in {1..10} #test
+        # for i in {1..2} #test
         i=1 ###############
         while true 
         do
@@ -81,7 +82,7 @@ function main(){
             dE=$(echo "scale=6; $E_pts - $E_TS2 " | bc)
             result=$(echo $dE'<'$E_error | bc -l) # 1=true, 0=false
             [ $result -eq 1 ] && break
-            i=$(($i+1))
+            i=$(($i+1)) ###
         done 
         echo '' >> Eff.dat 
         echo "The energy difference between the last point and TS2 is $dE hartree." >> Eff.dat 
@@ -132,6 +133,8 @@ function genPts(){
     multi=$4
 
 cat << EOF > $1_F.com 
+%nprocshared=16
+%mem=32GB
 `cat $2`
 force
 
@@ -139,6 +142,16 @@ calculate force
 
 $charge $multi
 `tail -n $NAtoms $1.xyz`
+
+C H O Br 0
+6-31g(d)
+****
+Rh 0
+lanl2dz
+****
+
+Rh 0
+lanl2dz
 
 EOF
 }
@@ -182,14 +195,10 @@ cat << EOF > job$1.sge
 #!/bin/bash
 export PATH=\$PATH:\$HOME/bin:/opt/util
 
-### Default Control
-## Run job through bash shell
+### Default SGE Control
 #$ -S /bin/sh -w w -j y -cwd 	### Run job through bash shell
-### Join stdout and stderr
 #$ -j y							### Join stdout and stderr
-## Resource control' ; newest:q40-q42; second: q69-q75
-## $ -l hostname='q40|q41|q42|q69|q70|q71|q72|q73|q74|q75'			### Resource control
-### Use current working directory
+#$ -l hostname='q50|q51'			### Resource control
 #$ -cwd							### Use current working directory
 
 ### SGE Environment
@@ -266,7 +275,7 @@ function getEandXYZ(){
         cat $a\_F.xyz >> $4
     done
     # rotate TSS2
-    ~/bin/rot.py $TS2name.xyz $1\_F.xyz #output: rot.$TS2name.xyz
+    rot.py $TS2name.xyz $1\_F.xyz #output: rot.$TS2name.xyz
     mv rot.$TS2name.xyz $TS2name.xyz 
 
     E=$(checkGau $TS2name.log | grep $TS2name | awk '{print $2}')
