@@ -1,17 +1,4 @@
 # **Numerical 2D-PES of Reactions with PTSB**
-
-<!-- ## Table of Content
-- [**Numerical 2D-PES of Reactions with PTSB**](#numerical-2d-pes-of-reactions-with-ptsb)
-  - [Aim and Reference](#aim-and-reference)
-  - [Processes to Generate 2D-PESs](#processes-to-generate-2d-pess)
-    - [Step 1: Calculate Stationary Points and IRCs.](#step-1-calculate-stationary-points-and-ircs)
-    - [Step 2: Asymmetric Cases: Generate Artificial Reaction Coordinate](#step-2-asymmetric-cases-generate-artificial-reaction-coordinate)
-    - [Step 3: Construct X- and Y-Axes (Optional)](#step-3-construct-x--and-y-axes-optional)
-      - [*Symmetric Cases*](#symmetric-cases)
-      - [*Asymmetric Cases*](#asymmetric-cases)
-    - [Step 4: Select 1D Grid Points for All IRC Paths](#step-4-select-1d-grid-points-for-all-irc-paths)
-    - [Step 5: Scan a 2D-PES](#step-5-scan-a-2d-pes)
-
 ## Aim and Reference
 * Using several programs/scripts to general a numerical two-dimensional potential energy surface (2D-PES) of reaction with post-transition-state bifurcation (PTSB).
 * Supporting information of [Construction of Two-Dimensional Potential Energy Surfaces of Reactions with Post-Transition-State Bifurcations.][1]
