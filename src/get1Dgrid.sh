@@ -3,7 +3,7 @@
 # Program:                                                          #
 #                                                                   #
 #   pre-requisited scripts:                                         #
-#       1. checkGau                                                 #                                                #
+#       1. checkGau                                                 #                           #                                                                   #
 #       2. rev1Dstruc                                               #
 #       3. rot.py                                                   #
 #                                                                   #

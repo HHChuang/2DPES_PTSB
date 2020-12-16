@@ -1,8 +1,7 @@
 # **Numerical 2D-PES of Reactions with PTSB**
 
-## Table of Content
+<!-- ## Table of Content
 - [**Numerical 2D-PES of Reactions with PTSB**](#numerical-2d-pes-of-reactions-with-ptsb)
-  - [Table of Content](#table-of-content)
   - [Aim and Reference](#aim-and-reference)
   - [Processes to Generate 2D-PESs](#processes-to-generate-2d-pess)
     - [Step 1: Calculate Stationary Points and IRCs.](#step-1-calculate-stationary-points-and-ircs)
@@ -210,7 +209,7 @@
         </div> 
 3. Plot contour and 3D version figure; execute step 1, 2 and 4 in `plotPESandTraj.py`, which is *line 215* , *line 218* and *line 224*. 
     <div style='float: center'>
-           <img style='width: 300px' src="./aux/Fig/plotPES.png"></img>
+           <img style='width: 250px' src="./aux/Fig/plotPES.png"></img>
     </div> 
 4. Modify this potential if it is not 'reasonable'.
     - Code:
