@@ -6,6 +6,11 @@
 #       $2 = coord. of important points                     #
 #           format:                                         #
 #           $(name of point) $(x) $(y) $(z)                 #
+#           R1  x1  y1  z1                                  #
+#           TS1 x2  y2  z2                                  #
+#           (other important pts...)                        #
+#                                                           #
+#           *energy reference = energy of reactant = z1*    #
 #                                                           #
 # History:                                                  #
 # 2018/10/23, Grace, revised; add input arguments           #
@@ -17,6 +22,8 @@
 # 2019/09/24, Grace, add VRIregion(); zoom-in the region    #
 #   between TSS1 and TSS2, and also colorcode this area.    #
 # 2020/05/21, Grace, debug of the size of figures.          #
+# 2021/01/04, Grace, rewrite twoDwPts(); divide it into     #
+#               different small functions.                  #
 #############################################################
 
 import sys
@@ -46,7 +53,7 @@ zaxis = 'kcal/mol'
 # plt.rcParams.update({'font.size': 14})
 axis_fontsize = 15
 
-sysIndex = 5  # 1 = NCH1, 2 = NCH2, 3 = NCH3, 4 = NCH4 and 5 = NCH5
+# sysIndex = 5  # 1 = NCH1, 2 = NCH2, 3 = NCH3, 4 = NCH4 and 5 = NCH5
 
 
 def main():
@@ -54,7 +61,7 @@ def main():
     X, Y, E, pts_name, pts_coord = getInput()
 
     # 2. plot 2D PES with important points
-    twoDwPts(X, Y, E, pts_name, pts_coord)
+    # plt = twoDwPts(X, Y, E, pts_name, pts_coord)
     # VRIregion(X, Y, E, pts_name, pts_coord)
 
     # 3. plot 2D PES with mapping trajectories
@@ -62,11 +69,14 @@ def main():
     # twoDwTraj(X, Y, E, PATH_RP2, '-b', RP2dir)  # blue trajectories
 
     # 4. plot 3D PES with important points
-    # threeDwPts(X, Y, E, pts_name, pts_coord)
+    threeDwPts(X, Y, E, pts_name, pts_coord)
 
     # 5. plot 3D PES with mapping trajectories
     # threeDwTraj(X, Y, E, PATH_RP1, 'r')
     # threeDwTraj(X, Y, E, PATH_RP2, 'b')
+
+    plt.show()
+    plt.close()
 
 
 def totline(fname):
@@ -130,69 +140,67 @@ def getTraj(path, fname):
     return x, y, e
 
 
-def twoDwPts(X, Y, E, pts_name, pts_coord):
+def twoD_Hartree(X, Y, E):
     mpl.rcParams['contour.negative_linestyle'] = 'solid'
-    fig = plt.figure()
-    plt.gca().set_aspect('equal')  # aspect ratio of x and y is equal
+    ct = plt.contour(X, Y, E,  20, colors='k')
+    plt.clabel(ct, inline=1, fmt='%1.0f', fontsize=8)  # value of contour
+    return plt
 
-    # Calculate relative energy in kcal/mol, and use reactant
-    # energy as the energy reference
-    E_R = pts_coord[0][2]
-    dim = int(math.sqrt(np.size(E)))
+
+def twoD_kcal(X, Y, E, E_R):
     relE = E
+    dim = int(math.sqrt(np.size(E)))
     for i in range(dim):
         for j in range(dim):
             relE[i][j] = (E[i][j] - E_R) * 627.5095
-
+    mpl.rcParams['contour.negative_linestyle'] = 'solid'
     ct = plt.contour(X, Y, relE, 20, colors='k')
     plt.clabel(ct, inline=1, fmt='%1.0f', fontsize=8)  # value of contour
+    return plt
+
+
+def twoDwPts(X, Y, E, pts_name, pts_coord):
+
+    ### Step 1. Select different energy unit TODO: ###
+    #   Case 1.  energy in Hartree
+    plt = twoD_Hartree(X, Y, E)
+    #   Case 2. energy in kcal/mol
+    # plt = twoD_kcal(X, Y, E, pts_coord[0][2])
+
+    # General setting of figure 'plt'
+    plt.gca().set_aspect('equal')  # aspect ratio of x and y is equal
     plt.title(title)
     plt.xlabel(xaxis, fontsize=axis_fontsize)
     plt.ylabel(yaxis, fontsize=axis_fontsize)
     plt.xticks(fontsize=axis_fontsize)
     plt.yticks(fontsize=axis_fontsize)
-    # plt.xticks([0.47, 0.97, 1.47])
-    # plt.yticks([98, 108, 118])
 
-    # plot important points
+    ### Step 2. plot important point on this 2D-PES ###
+    shift = 1.5  # shift x and y value by 1.5 times
     npts = totline(str(sys.argv[2]))
-    # NCHn
-    shift_x = [[1, -7, 1, 1, 1], [1, -8, 1, 1, 1],
-               [1.5, -8.5, 1.5, 1.5, 1.5], [1, -7, 1.5, 1.5, 1.5], [2, -10, 1.5, 1.5, 1.5]]
-    shift_y = [[3.5, 1, 1, 1, -1], [3.5, 1, 1, 1, -1],
-               [4, 1, 1, 1, -1], [3.5, 1, 1, 1, -1], [3.5, 1, 1, 1, -1]]
-
-    # shift_x = [0, -5, 1, 0, 0]
-    # shift_y = [3, 1, 1, 3, -1]
-    # H3CO
-    # shift_x = [0.0, -0.3, -0.3, -0.1, -0.1]
-    # shift_y = [0.3, 0.3, 0.3, 0.3, -0.2]
     for n in range(npts):
-        print(sysIndex, shift_x[sysIndex-1][n], shift_y[sysIndex-1][n])
         plt.plot(pts_coord[n][0], pts_coord[n][1], 'ro')
-        plt.text(pts_coord[n][0] + shift_x[sysIndex-1][n], pts_coord[n][1]+shift_y[sysIndex-1][n],
-                 pts_name[n], weight='bold', backgroundcolor='white',
+        plt.text(shift*pts_coord[n][0], shift*pts_coord[n][1], pts_name[n], weight='bold', backgroundcolor='white',
                  verticalalignment='top', multialignment='right', fontsize=axis_fontsize)
-    # order of savefig() and show() is important
-    # fig.savefig(PATH_fig + '2DwPts.png', dpi=100)
 
+    # FIXME:
     # label the VRI region within a red box
-    VRIheight = [3, 6, 3, 3, 6]
-    # TODO:
-    # m = sysIndex
-    plt.plot([pts_coord[1][0], pts_coord[1][0]],
-             [-VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
-    plt.plot([pts_coord[1][0], pts_coord[2][0]], [
-             VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
-    plt.plot([pts_coord[2][0], pts_coord[2][0]],
-             [-VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
-    plt.plot([pts_coord[1][0], pts_coord[2][0]],
-             [-VRIheight[sysIndex-1], -VRIheight[sysIndex-1]], '-r')
+    # VRIheight = [3, 6, 3, 3, 6]
+    # # m = sysIndex
+    # plt.plot([pts_coord[1][0], pts_coord[1][0]],
+    #          [-VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
+    # plt.plot([pts_coord[1][0], pts_coord[2][0]], [
+    #          VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
+    # plt.plot([pts_coord[2][0], pts_coord[2][0]],
+    #          [-VRIheight[sysIndex-1],  VRIheight[sysIndex-1]], '-r')
+    # plt.plot([pts_coord[1][0], pts_coord[2][0]],
+    #          [-VRIheight[sysIndex-1], -VRIheight[sysIndex-1]], '-r')
 
-    # fig.set_size_inches(5, 7.5)
-    fig.tight_layout()
-    fig = plt.show()
-    plt.close(fig)
+    # # fig.set_size_inches(5, 7.5)
+    # fig.tight_layout()
+    # fig = plt.show()
+    # plt.close(fig)
+    return plt
 
 
 def VRIregion(X, Y, E, pts_name, pts_coord):
@@ -335,63 +343,76 @@ def set_aspect_equal_3d(ax):
 #########################################################
 
 
-def threeDwPts(X, Y, E, pts_name, pts_coord):
-    # change hartree to relative energy
+def threeD_Hartree(X, Y, E, ptE):
+    ax = plt.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, E,  cmap=mpl.cm.binary,
+                           alpha=0.6, linewidth=1, edgecolors='black')
+    return ax, ptE
+
+
+def threeD_kcal(X, Y, E, refE, pts_coord):
     npts = totline(str(sys.argv[2]))
-    #   energy reference : reactant
-    Renergy = pts_coord[0][2]
     dim2 = np.size(E)
     dim = int(math.sqrt(dim2))
+    relE = E
+    # change energy into kcal/mol for PES
     for i in range(dim):
         for j in range(dim):
-            E[i][j] = (E[i][j] - Renergy) * 627.5095
+            relE[i][j] = (E[i][j] - refE) * 627.5095
+    # change energy into kcal/mol for selected points
+    nPts = np.size(pts_coord, 0)
+    ptE = pts_coord[:, 2]
+    for i in range(nPts):
+        ptE[i] = (pts_coord[i][2]-refE)*627.5095
 
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    ax = plt.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, relE,  cmap=mpl.cm.binary,
+                           alpha=0.6, linewidth=1, edgecolors='black')
+    return ax, ptE
+
+
+def threeDwPts(X, Y, E, pts_name, pts_coord):
+    # Step 1. Set up the unit of energy
+    #   Case 1. Hartree
+    ax, ptE = threeD_Hartree(X, Y, E, pts_coord[:, 2])
+    #   Case 2. kcal/mol
+    # ax, ptE = threeD_kcal(X, Y, E, pts_coord[0][2], pts_coord)
+    #   General setting
     ax.pbaspect = [2.0, 0.6, 0.25]
-    # plt.title(title)
-    # plt.xticks([0.47, 0.97, 1.47])
-    # plt.yticks([98, 108, 118])
-    # ax = fig.add_subplot((111), aspect='equal', projection='3d')
-
-    ax.set_aspect('equal')  # ratio of x and y axes, 'auto', 'equal'
-
-    # ratio of 3D box
-    ax.pbaspect = [1.0, 2.0, 1.0]
-
-    # set_axes_equal(ax)
-    # set_aspect_equal_3d(ax)
-    # ax.auto_scale_xyz([-16, 5], [-16, 16], [0, 100])
-
-    surf = ax.plot_surface(X, Y, E,  cmap=mpl.cm.binary, alpha=0.6,
-                           linewidth=1, edgecolors='black')
-
-    # ct = plt.contour(X, Y, E, 25, colors='k')
-
     ax.set_xlabel(xaxis)
     ax.set_ylabel(yaxis)
     ax.set_zlabel(zaxis)
     # range of z-axis; range of energy profile
     ax.set_xlim(X.min(), X.max())
     ax.set_ylim(Y.min(), Y.max())
-    ax.set_zlim(-20, 100)
+    # ax.set_zlim(-20, 100)
 
-    # plot important points
+    # Archive setting for test ###
+    # plt.title(title)
+    # plt.xticks([0.47, 0.97, 1.47])
+    # plt.yticks([98, 108, 118])
+    # ax = fig.add_subplot((111), aspect='equal', projection='3d')
+
+    # ax.set_aspect('equal')  # ratio of x and y axes, 'auto', 'equal'
+
+    # # ratio of 3D box
+    # ax.pbaspect = [1.0, 2.0, 1.0]
+
+    # set_axes_equal(ax)
+    # set_aspect_equal_3d(ax)
+    # ax.auto_scale_xyz([-16, 5], [-16, 16], [0, 100])
+    # # ct = plt.contour(X, Y, E, 25, colors='k')
+    ### End of archive setting ###
+
+    # Step 2. Plot important points
     npts = totline(str(sys.argv[2]))
-    # H3CO
-    shift_x = [-0.5, -0.6, -0.6, -0.8, -1.0]
-    shift_y = [0.3, 0.3, 0.3, 0.3, 0.4]
-    for i in range(npts):
-        pts_coord[i][2] = (pts_coord[i][2] - Renergy) * 627.5095
+    shift = 1.0
 
     for n in range(npts):
         ax.scatter(pts_coord[n][0], pts_coord[n][1],
-                   pts_coord[n][2], marker='o', c='r', edgecolors='k', zorder=10)
-        ax.text(pts_coord[n][0] + shift_x[n], pts_coord[n][1] + shift_y[n], pts_coord[n]
-                [2] + 2, pts_name[n], weight='bold', backgroundcolor='white', zorder=10, fontsize=12)
-    # fig.savefig(PATH_fig + '3DwPts.png', dpi=100)
-    plt.show()
-    plt.close(fig)
+                   ptE[n], marker='o', c='r', edgecolors='k', zorder=10)
+        ax.text(shift*pts_coord[n][0], shift*pts_coord[n][1], shift*ptE[n],
+                pts_name[n], weight='bold', backgroundcolor='white', zorder=10, fontsize=12)
 
 
 def threeDwTraj(X, Y, E, PATH, color):
